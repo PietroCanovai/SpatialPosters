@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import type { TMDBImage } from "@/lib/types"
 import { LANG_NAMES, groupBy } from "@/lib/utils"
@@ -24,7 +24,7 @@ interface Props {
   showTabs?: boolean
 }
 
-export function PosterOptions({ posters, posterActivePath, lang, selectPoster, activeGroup: controlledActiveGroup, onActiveGroupChange, showTabs = true }: Props) {
+export function PosterOptions({ posters: tmdbPosters, posterActivePath, lang, selectPoster, activeGroup: controlledActiveGroup, onActiveGroupChange, showTabs = true }: Props) {
   const selectedLogo = usePSelector((v) => v.selectedLogo)
   const selected = usePSelector((v) => v.selected)
   const mappingsMap = usePSelector((v) => v.mappingsMap)
@@ -43,6 +43,7 @@ export function PosterOptions({ posters, posterActivePath, lang, selectPoster, a
         await fetchReddit(true)
       }
       await refreshPosters()
+      await loadProviders(true)
       toast.success(t("ui.postersRefreshed") || "Refreshed latest posters from TMDB & Reddit!")
     } catch {
       toast.error(t("ui.refreshFailed") || "Failed to refresh posters")
@@ -52,6 +53,34 @@ export function PosterOptions({ posters, posterActivePath, lang, selectPoster, a
   }
 
   const excludedSet = useMemo(() => new Set(ed.excludedPosters), [ed.excludedPosters])
+
+  // --- Fonti poster oltre a TMDB (TheTVDB, fanart.tv, TVmaze, AniList, Kitsu, AniDB, AniSearch) ---
+  const [providerResults, setProviderResults] = useState<{ provider: string; label: string; posters: TMDBImage[]; note?: string }[]>([])
+  const [source, setSource] = useState("tmdb")
+  const loadProviders = useCallback(async (force = false) => {
+    if (!selected?.id) return
+    const type = selected.media_type === "tv" ? "tv" : "movie"
+    try {
+      const res = await fetch(`/api/posters/providers?type=${type}&id=${selected.id}${force ? "&force=1" : ""}`)
+      const data = res.ok ? await res.json() : null
+      setProviderResults(Array.isArray(data?.providers) ? data.providers : [])
+    } catch {
+      setProviderResults([])
+    }
+  }, [selected?.id, selected?.media_type])
+  useEffect(() => {
+    setSource("tmdb")
+    setProviderResults([])
+    loadProviders()
+  }, [loadProviders])
+  const sources = useMemo(() => [
+    { key: "tmdb", label: "TMDB", count: tmdbPosters.length },
+    ...providerResults.filter((r) => r.posters.length > 0).map((r) => ({ key: r.provider, label: r.label, count: r.posters.length })),
+  ], [tmdbPosters.length, providerResults])
+  const posters = useMemo(
+    () => (source === "tmdb" ? tmdbPosters : (providerResults.find((r) => r.provider === source)?.posters ?? [])),
+    [source, tmdbPosters, providerResults],
+  )
 
   const storageKey = useMemo(() => {
     return selected?.id ? `spatial_custom_posters_${selected.id}` : "spatial_custom_posters_global"
@@ -209,10 +238,10 @@ export function PosterOptions({ posters, posterActivePath, lang, selectPoster, a
   }
 
   const cleanPosters = useMemo(() => {
-    const userClean = customPosters.filter((img) => !excludedSet.has(img.file_path))
+    const userClean = source === "tmdb" ? customPosters.filter((img) => !excludedSet.has(img.file_path)) : []
     const defaultClean = posters.filter((img) => img.iso_639_1 === null && !excludedSet.has(img.file_path))
     return [...userClean, ...defaultClean]
-  }, [posters, excludedSet, customPosters])
+  }, [posters, excludedSet, customPosters, source])
 
   const hasClean = cleanPosters.length > 0
   const langGroups = useMemo(
@@ -227,7 +256,7 @@ export function PosterOptions({ posters, posterActivePath, lang, selectPoster, a
   const posterTabs = useMemo(() => {
     const tabs: { key: string; label: string; count: number }[] = []
     if (hasClean) tabs.push({ key: "clean", label: "Clean", count: cleanPosters.length })
-    if (redditPosters.length > 0) {
+    if (source === "tmdb" && redditPosters.length > 0) {
       tabs.push({ key: "reddit", label: "Reddit", count: redditPosters.length })
     }
     for (const [language, imgs] of langGroups) {
@@ -238,7 +267,7 @@ export function PosterOptions({ posters, posterActivePath, lang, selectPoster, a
       tabs.push({ key: "excluded", label: t("ui.excluded") || "Excluded", count: excludedSet.size })
     }
     return tabs
-  }, [hasClean, cleanPosters.length, langGroups, excludedSet.size, t, excludedSet, redditPosters.length])
+  }, [hasClean, cleanPosters.length, langGroups, excludedSet.size, t, excludedSet, redditPosters.length, source])
 
   const [internalActiveGroup, setInternalActiveGroup] = useState("clean")
   const activeGroup = controlledActiveGroup ?? internalActiveGroup
@@ -311,6 +340,9 @@ export function PosterOptions({ posters, posterActivePath, lang, selectPoster, a
   }, [selected?.id])
 
   const autoSelectFitKey = useMemo(() => {
+    // Solo sulla lista TMDB iniziale: sfogliare un'altra fonte non deve mai
+    // cambiare il poster scelto.
+    if (source !== "tmdb") return null
     if (!ed.defaultLogoFitEnabled || !bestPoster || !selectedLogo) return null
     return JSON.stringify([
       bestPoster.file_path,
@@ -319,6 +351,7 @@ export function PosterOptions({ posters, posterActivePath, lang, selectPoster, a
       ed.globalBadges,
     ])
   }, [
+    source,
     bestPoster,
     cleanPosters,
     ed.defaultLogoFitEnabled,
@@ -447,6 +480,31 @@ export function PosterOptions({ posters, posterActivePath, lang, selectPoster, a
     <div>
       {showTabs && (
         <div className="space-y-2 mb-3">
+          {/* Row 0: sorgente dei poster (solo fonti con risultati) */}
+          {sources.length > 1 && (
+            <div className="w-full min-w-0">
+              <div className="flex items-center gap-1 overflow-x-auto scrollbar-none scroll-fade-mask" role="tablist" aria-label="Poster source">
+                <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 px-1 shrink-0">Source</span>
+                {sources.map((src) => (
+                  <button
+                    key={src.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={source === src.key}
+                    onClick={() => setSource(src.key)}
+                    className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all ${
+                      source === src.key
+                        ? "bg-zinc-100 text-zinc-950 border-white/80"
+                        : "bg-white/[0.04] border-white/10 text-zinc-300 hover:bg-white/[0.08]"
+                    }`}
+                  >
+                    {src.label} <span className="opacity-60 font-mono">{src.count}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Row 1: Dedicated 100% width scrollable PosterTabs */}
           <div className="w-full min-w-0">
             <PosterTabs tabs={posterTabs} activeGroup={activeGroup} onSelect={setActiveGroup} />
@@ -634,7 +692,7 @@ export function PosterOptions({ posters, posterActivePath, lang, selectPoster, a
               const isBestFit = bestFitPath === img.file_path
               const showBadge = isBestFit && bestScore >= 0.45
               const isHighScore = bestScore >= 0.65
-              const isCustom = (img.file_path.startsWith("http://") || img.file_path.startsWith("https://")) && !(img as any)._redditAuthor
+              const isCustom = (img.file_path.startsWith("http://") || img.file_path.startsWith("https://")) && !(img as any)._redditAuthor && !("source" in img)
 
               return (
                 <div key={img.file_path} className={`relative group rounded-xl overflow-hidden transition-all duration-200 ${isBestFit && bestScore >= 0.45 ? `ring-1 ${isHighScore ? "ring-orange-400/70 shadow-[0_0_18px_rgba(232,93,42,0.15)]" : "ring-amber-400/50"}` : ""}`}>
@@ -722,7 +780,7 @@ export function PosterOptions({ posters, posterActivePath, lang, selectPoster, a
             {visibleLangImgs.map((img) => {
               const stagger = idx++
               const isExcluded = excludedSet.has(img.file_path)
-              const isCustom = (img.file_path.startsWith("http://") || img.file_path.startsWith("https://")) && !(img as any)._redditAuthor
+              const isCustom = (img.file_path.startsWith("http://") || img.file_path.startsWith("https://")) && !(img as any)._redditAuthor && !("source" in img)
 
               return (
                 <div key={img.file_path} className="relative group rounded-xl overflow-hidden">

@@ -20,7 +20,8 @@ export const LANG_NAMES: Record<string, string> = {
   zh: "中文", ru: "Русский", ar: "العربية", nl: "Nederlands",
   pl: "Polski", sv: "Svenska", tr: "Türkçe", hi: "हिन्दी",
   he: "עברית",
-  xx: "Senza lingua",
+  xx: "No language",
+  und: "Unknown language",
 }
 
 export function getDomain() {

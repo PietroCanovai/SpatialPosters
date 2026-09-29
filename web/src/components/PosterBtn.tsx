@@ -38,7 +38,7 @@ export const PosterBtn = React.memo(function PosterBtn({ img, active, onSelect, 
         {!active && <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-white/5 transition-opacity duration-300" />}
 
         {/* Risoluzione dell'originale TMDB (i poster da URL custom/Reddit non hanno dimensioni reali) */}
-        {img.width > 0 && img.height > 0 && !/^https?:\/\//.test(img.file_path) && (
+        {img.width > 0 && img.height > 0 && (!/^https?:\/\//.test(img.file_path) || "source" in img) && (
           <span className={`absolute left-1 ${active ? "bottom-5" : "bottom-1"} z-10 text-[9px] font-mono font-semibold tabular-nums px-1 py-px rounded bg-black/70 text-zinc-100 backdrop-blur-sm`}>
             {img.width}×{img.height}
           </span>

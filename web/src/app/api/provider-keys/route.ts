@@ -13,6 +13,9 @@ export const dynamic = "force-dynamic"
 const bodySchema = z.object({
   tmdb: z.string().max(300).optional(),
   mdblist: z.string().max(300).optional(),
+  tvdb: z.string().max(300).optional(),
+  fanart: z.string().max(300).optional(),
+  anidb: z.string().max(100).optional(),
 })
 
 /** Chiavi effettive (admin-only: servono al client per le chiamate TMDB dirette). */

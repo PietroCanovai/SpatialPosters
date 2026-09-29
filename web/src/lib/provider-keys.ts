@@ -14,13 +14,16 @@ const log = createLogger("provider-keys")
  * sull'ambiente.
  */
 
-export const PROVIDERS = ["tmdb", "mdblist"] as const
+export const PROVIDERS = ["tmdb", "mdblist", "tvdb", "fanart", "anidb"] as const
 export type Provider = (typeof PROVIDERS)[number]
 export type ProviderKeys = Partial<Record<Provider, string>>
 
 const ENV_NAME: Record<Provider, string> = {
   tmdb: "SPATIALPOSTERS_TMDB_KEY",
   mdblist: "SPATIALPOSTERS_MDBLIST_KEY",
+  tvdb: "SPATIALPOSTERS_TVDB_API_KEY",
+  fanart: "SPATIALPOSTERS_FANART_KEY",
+  anidb: "SPATIALPOSTERS_ANIDB_CLIENT",
 }
 
 function file(): string {
@@ -67,6 +70,9 @@ export function effectiveProviderKeys(): Record<Provider, string> {
   return {
     tmdb: process.env.SPATIALPOSTERS_TMDB_KEY || process.env.TMDB_API_KEY || process.env.TMDB_KEY || "",
     mdblist: process.env.SPATIALPOSTERS_MDBLIST_KEY || process.env.MDBLIST_API_KEY || process.env.MDBLIST_KEY || "",
+    tvdb: process.env.SPATIALPOSTERS_TVDB_API_KEY || process.env.TVDB_API_KEY || "",
+    fanart: process.env.SPATIALPOSTERS_FANART_KEY || "",
+    anidb: process.env.SPATIALPOSTERS_ANIDB_CLIENT || "",
   }
 }
 
@@ -79,8 +85,28 @@ export async function validateProviderKey(provider: Provider, key: string): Prom
       const data = res.ok ? await res.json().catch(() => null) : null
       return data?.success === true ? { valid: true } : { valid: false, message: "TMDB rejected this key" }
     }
-    const res = await fetch(`https://api.mdblist.com/user?apikey=${k}`, { signal: AbortSignal.timeout(8000) })
-    return res.ok ? { valid: true } : { valid: false, message: "MDBList rejected this key" }
+    if (provider === "mdblist") {
+      const res = await fetch(`https://api.mdblist.com/user?apikey=${k}`, { signal: AbortSignal.timeout(8000) })
+      return res.ok ? { valid: true } : { valid: false, message: "MDBList rejected this key" }
+    }
+    if (provider === "tvdb") {
+      const res = await fetch("https://api4.thetvdb.com/v4/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apikey: key.trim() }),
+        signal: AbortSignal.timeout(8000),
+      })
+      return res.ok ? { valid: true } : { valid: false, message: "TheTVDB rejected this key" }
+    }
+    if (provider === "fanart") {
+      const res = await fetch(`https://webservice.fanart.tv/v3/movies/27205?api_key=${k}`, { signal: AbortSignal.timeout(8000) })
+      return res.status !== 401 && res.status !== 403 ? { valid: true } : { valid: false, message: "fanart.tv rejected this key" }
+    }
+    // AniDB: il "client" registrato sull'account; una richiesta con client
+    // non valido risponde <error>client version missing or invalid</error>.
+    const res = await fetch(`http://api.anidb.net:9001/httpapi?request=anime&client=${k}&clientver=1&protover=1&aid=1`, { signal: AbortSignal.timeout(8000) })
+    const body = await res.text()
+    return /<error[^>]*>[^<]*client/i.test(body) ? { valid: false, message: "AniDB doesn't recognise this client name (register it on anidb.net, version 1)" } : { valid: true }
   } catch (e) {
     return { valid: false, message: `Could not reach ${provider.toUpperCase()} (${e instanceof Error ? e.message : String(e)})` }
   }

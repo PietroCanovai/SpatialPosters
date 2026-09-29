@@ -5,7 +5,7 @@ import { Check, ExternalLink, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { usePSelector } from "@/lib/context"
 
-type Provider = "tmdb" | "mdblist"
+type Provider = "tmdb" | "mdblist" | "tvdb" | "fanart" | "anidb"
 type Keys = Record<Provider, string>
 
 const PROVIDERS: { id: Provider; name: string; required?: boolean; purpose: string; getKeyUrl: string; getKeyHint: string }[] = [
@@ -24,6 +24,27 @@ const PROVIDERS: { id: Provider; name: string; required?: boolean; purpose: stri
     getKeyUrl: "https://mdblist.com/preferences/",
     getKeyHint: "mdblist.com → Preferences → API key",
   },
+  {
+    id: "fanart",
+    name: "Fanart.tv",
+    purpose: "Optional. More posters (including textless ones) from fanart.tv.",
+    getKeyUrl: "https://fanart.tv/get-an-api-key/",
+    getKeyHint: "fanart.tv → Get an API key (personal key)",
+  },
+  {
+    id: "tvdb",
+    name: "TheTVDB",
+    purpose: "Optional. Posters from TheTVDB for series and movies.",
+    getKeyUrl: "https://thetvdb.com/api-information",
+    getKeyHint: "thetvdb.com → API Information → project API key",
+  },
+  {
+    id: "anidb",
+    name: "AniDB",
+    purpose: "Optional. Anime cover from AniDB. Enter a client name registered on your AniDB account (version 1). AniSearch, AniList, Kitsu and TVmaze need no key.",
+    getKeyUrl: "https://anidb.net/software/add",
+    getKeyHint: "anidb.net → Account → Add client (name, version 1)",
+  },
 ]
 
 /**
@@ -34,8 +55,8 @@ export function ProviderKeysPanel({ active }: { active: boolean }) {
   const setTmdbKey = usePSelector((v) => v.setTmdbKey)
   const setMdblistApiKey = usePSelector((v) => v.setMdblistApiKey)
 
-  const [saved, setSaved] = useState<Keys>({ tmdb: "", mdblist: "" })
-  const [draft, setDraft] = useState<Keys>({ tmdb: "", mdblist: "" })
+  const [saved, setSaved] = useState<Keys>({ tmdb: "", mdblist: "", tvdb: "", fanart: "", anidb: "" })
+  const [draft, setDraft] = useState<Keys>({ tmdb: "", mdblist: "", tvdb: "", fanart: "", anidb: "" })
   const [errors, setErrors] = useState<Partial<Keys>>({})
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -113,7 +134,7 @@ export function ProviderKeysPanel({ active }: { active: boolean }) {
             </div>
             <p className="text-[11px] text-zinc-400">{p.purpose}</p>
             <input
-              type="password"
+              type={p.id === "anidb" ? "text" : "password"}
               autoComplete="off"
               spellCheck={false}
               disabled={!loaded}
