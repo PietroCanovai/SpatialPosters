@@ -137,12 +137,12 @@ export async function DELETE(req: NextRequest) {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
-  const searchToken = req.nextUrl.searchParams.get("token") || req.nextUrl.searchParams.get("adminToken")
-  const envAdminToken = process.env.PICTORIUM_ADMIN_TOKEN || process.env.ADMIN_TOKEN
-  const isQueryTokenValid = !!envAdminToken && searchToken === envAdminToken
+  // Il token admin è accettato solo via header (checkAdminToken). Prima era
+  // accettato anche in query string (?token=), finendo in log e cronologia,
+  // e confrontato senza timing-safe equality.
   const currentPin = typeof body?.currentPin === "string" ? body.currentPin.trim() : ""
   const isCurrentValid = currentPin ? await verifyPin(currentPin) : false
-  const isAdmin = checkAdminToken(req) || isQueryTokenValid
+  const isAdmin = checkAdminToken(req)
 
   if (!isCurrentValid && !isAdmin) {
     return Response.json({ error: "PIN attuale non corretto" }, { status: 401 })

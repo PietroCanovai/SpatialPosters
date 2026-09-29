@@ -7,6 +7,7 @@ export default defineConfig({
     testTimeout: 20000,
     setupFiles: ["./src/__tests__/setup.ts"],
     exclude: [
+      "desktop/**",
       "node_modules/**",
       ".kilo/**",
       ".claude/**",

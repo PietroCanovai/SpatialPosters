@@ -1,0 +1,61 @@
+{
+  "name": "spatialposters-desktop",
+  "productName": "SpatialPosters",
+  "version": "1.10.0",
+  "description": "SpatialPosters as a Windows desktop app",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "prepare-server": "node scripts/prepare-server.mjs",
+    "start": "electron .",
+    "build-and-start": "npm run prepare-server && electron .",
+    "dist": "npm run prepare-server && electron-builder --win --publish never",
+    "dist:dir": "npm run prepare-server && electron-builder --win dir --publish never"
+  },
+  "devDependencies": {
+    "electron": "^44.5.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "io.github.pietrocanovai.spatialposters",
+    "productName": "SpatialPosters",
+    "copyright": "AGPL-3.0-only — based on SpatialPosters by @TheAceOfficials and Pictorium",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.cjs",
+      "assets/**"
+    ],
+    "extraResources": [
+      {
+        "from": "server",
+        "to": "server",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "publish": null,
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    },
+    "afterPack": "scripts/after-pack.cjs"
+  }
+}

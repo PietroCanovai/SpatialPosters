@@ -4,10 +4,15 @@ import { findAccentColor } from "@/lib/accent-color"
 import { GENRE_FALLBACK } from "@/lib/badges"
 // Batch B: STD_W/STD_H ora provengono da image-utils.ts (single source of truth)
 import { STD_W, STD_H, computeRegionStats } from "@/lib/image-utils"
+import { fetchPublicUrl } from "@/lib/safe-fetch"
 
 // Sovrascrivibile via env: nei test E2E punta al mock server locale per
 // rendere il rendering determinista senza dipendere da image.tmdb.org.
 const IMG_BASE = process.env.TMDB_IMG_URL || "https://image.tmdb.org/t/p"
+// Gli URL costruiti da imgSrc() sul base TMDB (configurato dall'operatore)
+// sono fidati; tutti gli altri (poster/logo/backdrop custom passati in query
+// alla poster route pubblica, og:image risolti) passano dal controllo SSRF.
+const TRUSTED_IMG_PREFIX = `${IMG_BASE}/`
 const MAX_IMG_SIZE = 10 * 1024 * 1024
 
 // Re-export per backward compat — tutti i file che importano STD_W/STD_H
@@ -64,11 +69,15 @@ export async function fetchImg(url: string, signal?: AbortSignal): Promise<Buffe
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
   }
-  let res = await fetch(targetUrl, { headers, signal: combined })
+  const doFetch = (u: string) =>
+    u.startsWith(TRUSTED_IMG_PREFIX)
+      ? fetch(u, { headers, signal: combined })
+      : fetchPublicUrl(u, { headers, signal: combined })
+  let res = await doFetch(targetUrl)
   if (!res.ok && targetUrl.includes("i.pinimg.com/originals/")) {
     // Fallback to 736x if originals returns non-200
     const fallbackUrl = targetUrl.replace("/originals/", "/736x/")
-    res = await fetch(fallbackUrl, { headers, signal: combined })
+    res = await doFetch(fallbackUrl)
   }
 
   if (!res.ok) throw new Error(`fetch failed: ${res.status}`)

@@ -1,5 +1,5 @@
 import fs from "node:fs/promises"
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import crypto from "node:crypto"
 import { DATA_DIR } from "@/lib/data-dir"
@@ -99,17 +99,15 @@ export function readSecurityConfigSync(): SecurityConfig {
 }
 
 export function getAdminPinFromEnv(): string | null {
+  // Nota: ADMIN_TOKEN NON è un PIN. Prima SPATIALPOSTERS_ADMIN_TOKEN veniva
+  // letto anche qui, attivando il lock-screen PIN con il token admin come
+  // password (e il token admin compariva in un form di login del browser).
   const pin =
-    process.env.SPATIALPOSTERS_ADMIN_PIN ||
-    process.env.SPATIALPOSTERS_SITE_PASSWORD ||
-    process.env.SPATIALPOSTERS_ADMIN_TOKEN ||
-    process.env.SPATIALPOSTERS_PIN ||
-    process.env.PICTORIUM_ADMIN_PIN ||
+    envWithFallback("ADMIN_PIN") ||
+    envWithFallback("SITE_PASSWORD") ||
+    envWithFallback("PIN") ||
     process.env.ADMIN_PIN ||
-    process.env.SITE_PASSWORD ||
-    envWithFallback("SPATIALPOSTERS_ADMIN_PIN") ||
-    envWithFallback("SPATIALPOSTERS_SITE_PASSWORD") ||
-    envWithFallback("SPATIALPOSTERS_ADMIN_TOKEN")
+    process.env.SITE_PASSWORD
   if (pin && typeof pin === "string" && pin.trim().length > 0) {
     return pin.trim()
   }
@@ -133,16 +131,38 @@ function isValidPinHash(pinHash?: string): boolean {
 
 export function hasPinConfiguredSync(): boolean {
   if (isPinDisabled()) return false
-  return !!getAdminPinFromEnv()
+  if (getAdminPinFromEnv()) return true
+  // PIN impostato dalla UI (PUT /api/auth/pin → security.json / KV). Prima
+  // veniva salvato ma mai applicato: il lock-screen restava aperto.
+  return isValidPinHash(readSecurityConfigSync().pinHash)
 }
 
+// Segreto effimero di processo: usato solo se non è possibile persisterne uno.
+// Mai un valore costante (prima: "spatialposters_default_session_secret",
+// che permetteva di forgiare cookie di sessione validi).
+const processSessionSecret = crypto.randomBytes(32).toString("hex")
+
 export function getSessionSecretSync(): string {
-  const envPin = getAdminPinFromEnv()
-  if (envPin) {
-    return crypto.createHash("sha256").update(`spatialposters_session_secret_${envPin}`).digest("hex")
-  }
   const cfg = readSecurityConfigSync()
-  return cfg.sessionSecret || "spatialposters_default_session_secret"
+  if (cfg.sessionSecret) return cfg.sessionSecret
+  // PIN da env senza segreto salvato: genera un segreto casuale e persistilo.
+  // Prima il segreto era sha256(costante + PIN): con un PIN corto chiunque
+  // avesse un cookie poteva ricavare il PIN offline e forgiare sessioni.
+  if (!useKv) {
+    try {
+      const file = getSecurityFile()
+      const sessionSecret = crypto.randomBytes(32).toString("hex")
+      const updated: SecurityConfig = { ...cfg, sessionSecret, updatedAt: new Date().toISOString() }
+      mkdirSync(getDataDir(), { recursive: true })
+      writeFileSync(file, JSON.stringify(updated, null, 2), "utf-8")
+      cachedConfig = updated
+      cacheAt = Date.now()
+      return sessionSecret
+    } catch (err) {
+      log.warn("Cannot persist session secret — sessions reset on restart", { err })
+    }
+  }
+  return processSessionSecret
 }
 
 export function verifySessionFromRequestSync(request: Request): boolean {
@@ -210,7 +230,9 @@ export function hashPin(pin: string, salt?: string): { hash: string; salt: strin
 
 export async function hasPinConfigured(): Promise<boolean> {
   if (isPinDisabled()) return false
-  return !!getAdminPinFromEnv()
+  if (getAdminPinFromEnv()) return true
+  const cfg = await readSecurityConfig()
+  return isValidPinHash(cfg.pinHash)
 }
 
 export async function verifyPin(pin: string): Promise<boolean> {
@@ -218,8 +240,6 @@ export async function verifyPin(pin: string): Promise<boolean> {
   const clean = pin.trim()
   const envPin = getAdminPinFromEnv()
   if (envPin) {
-    if (clean === envPin) return true
-    // Allow timing safe comparison for equal length
     const a = Buffer.from(clean)
     const b = Buffer.from(envPin)
     if (a.length !== b.length) return false

@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Home, RefreshCw, Settings, Check, Heart } from "lucide-react"
+import { Home, RefreshCw, Settings, Check } from "lucide-react"
 import { useT } from "@/lib/contexts/TranslationContext"
 import { setLang, getLang } from "@/lib/i18n"
 import { LANG_NAMES, UI_LANGUAGES } from "@/lib/utils"
@@ -296,19 +296,6 @@ export function DesktopSidebar() {
             </span>
           </Link>
 
-          {/* Patreon Support */}
-          <a
-            href="https://patreon.com/theaceofficials"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Support on Patreon"
-            className="group sidebar-dock-btn border-rose-500/30 hover:border-rose-500/60 bg-rose-500/10 hover:bg-rose-500/20"
-          >
-            <Heart className="w-4.5 h-4.5 transition-all duration-200 text-rose-400 group-hover:text-rose-300 fill-rose-500/30 group-hover:fill-rose-500/60" />
-            <span className="pointer-events-none absolute left-full ml-3.5 px-2.5 py-1 text-xs font-semibold rounded-xl border opacity-0 group-hover:opacity-100 transition-all duration-200 whitespace-nowrap shadow-xl z-50 bg-rose-950 text-rose-100 border-rose-500/30 shadow-black/80">
-              Support on Patreon 💖
-            </span>
-          </a>
         </div>
       </aside>
 

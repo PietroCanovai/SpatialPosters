@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server"
+import { fetchPublicUrl, resolveAndCheckBlocked } from "@/lib/safe-fetch"
 
 export const maxDuration = 30
 
@@ -7,27 +8,6 @@ const BROWSER_UA =
 
 // Social bot UA to scrape og:image from pages that serve it to bots
 const BOT_UA = "Twitterbot/1.0"
-
-function isPrivateHostname(hostname: string): boolean {
-  const h = hostname.toLowerCase()
-  if (
-    h === "localhost" ||
-    h === "127.0.0.1" ||
-    h === "0.0.0.0" ||
-    h === "::1" ||
-    h.endsWith(".local") ||
-    h.endsWith(".internal")
-  ) {
-    return true
-  }
-  if (/^10\./.test(h) || /^192\.168\./.test(h) || /^169\.254\./.test(h)) return true
-  const match172 = /^172\.(\d+)\./.exec(h)
-  if (match172) {
-    const octet = parseInt(match172[1], 10)
-    if (octet >= 16 && octet <= 31) return true
-  }
-  return false
-}
 
 /**
  * Guess if a URL is already a direct image URL (not a web page).
@@ -143,14 +123,13 @@ export async function resolveToImageUrl(rawUrl: string): Promise<{ imageUrl: str
     parsed.hostname === "redd.it"
 
   // Choose UA based on host
-  let ua = isPinterest || isReddit ? BOT_UA : BROWSER_UA
+  const ua = isPinterest || isReddit ? BOT_UA : BROWSER_UA
 
-  const res = await fetch(rawUrl, {
+  const res = await fetchPublicUrl(rawUrl, {
     headers: {
       "User-Agent": ua,
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     },
-    redirect: "follow",
     signal: AbortSignal.timeout(12000),
   })
 
@@ -171,9 +150,8 @@ export async function resolveToImageUrl(rawUrl: string): Promise<{ imageUrl: str
   let ogImage = extractOgImage(html)
   if (!ogImage) {
     // Re-try with browser UA for Pinterest / Reddit / any page if bot UA failed
-    const res2 = await fetch(rawUrl, {
+    const res2 = await fetchPublicUrl(rawUrl, {
       headers: { "User-Agent": BROWSER_UA },
-      redirect: "follow",
       signal: AbortSignal.timeout(12000),
     })
     if (res2.ok) {
@@ -211,7 +189,7 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: "Only HTTP/HTTPS URLs supported" }, { status: 400 })
   }
 
-  if (isPrivateHostname(parsed.hostname)) {
+  if (await resolveAndCheckBlocked(parsed.toString())) {
     return Response.json({ error: "Access to private/internal hosts forbidden" }, { status: 403 })
   }
 

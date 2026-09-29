@@ -40,6 +40,10 @@ const eslintConfig = defineConfig([
     ".next-load/**",
     // DistDir di bench-image-cache.mjs (stesso pattern di .next-load).
     ".next-bench/**",
+    // App desktop Electron: server/ è la build standalone copiata, dist/ gli installer.
+    "desktop/server/**",
+    "desktop/dist/**",
+    "desktop/node_modules/**",
     // Worktree Claude (.claude/worktrees/**): contengono una copia del repo con
     // il proprio .next generato, che altrimenti verrebbe lintato (868 errori
     // dai tipi generati da Next).
@@ -49,6 +53,11 @@ const eslintConfig = defineConfig([
     // .claude/**, fuori dal lint -- altrimenti npm run verify fallisce.
     ".pi/**",
   ]),
+  // Main process Electron: CommonJS, eseguito da Electron senza bundler.
+  {
+    files: ["desktop/**/*.cjs"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
 ]);
 
 export default eslintConfig;

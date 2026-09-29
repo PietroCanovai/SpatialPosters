@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useRef, useMemo } from "react"
-import { X, Check, Copy, Download, ExternalLink, Tv, Sparkles, Film, Search, Heart } from "lucide-react"
+import { X, Check, Copy, Download, ExternalLink, Tv, Sparkles, Film, Search } from "lucide-react"
 import QRCode from "qrcode"
 import { useT } from "@/lib/contexts/TranslationContext"
 
@@ -289,24 +289,6 @@ export function InstallHubPanel({ manifestUrl: propManifestUrl, posterUrlPattern
         </div>
       )}
 
-      {/* Support on Patreon Banner */}
-      <div className="p-3 rounded-xl bg-gradient-to-r from-rose-500/10 via-pink-500/10 to-amber-500/10 border border-rose-500/20 flex items-center justify-between gap-2 mt-2">
-        <div className="flex items-center gap-2 overflow-hidden">
-          <Heart className="w-4 h-4 text-rose-400 shrink-0 fill-rose-500/40" />
-          <div className="text-[11px] font-medium text-rose-100 truncate">
-            Support @TheAceOfficials open-source tools
-          </div>
-        </div>
-        <a
-          href="https://patreon.com/theaceofficials"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-500/25 transition-all active:scale-95 flex items-center gap-1"
-        >
-          <span>Patreon</span>
-          <ExternalLink className="w-3 h-3" />
-        </a>
-      </div>
     </div>
   )
 }

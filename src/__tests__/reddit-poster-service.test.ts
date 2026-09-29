@@ -15,49 +15,42 @@ describe("Reddit Poster Service", () => {
     expect(posters).toEqual([]) // Graceful fallback
   })
 
-  it("should parse Reddit JSON correctly", async () => {
-    const mockRedditResponse = {
-      data: {
-        children: [
-          {
-            data: {
-              id: "test1",
-              title: "Fight Club (1999) [TMDB: 550]",
-              url: "https://i.redd.it/test.jpg",
-              author: "testuser",
-              score: 150,
-              link_flair_text: "Clean Poster",
-              permalink: "/r/SpatialPosters/comments/test1/",
-              post_hint: "image"
-            }
-          },
-          {
-             data: {
-              id: "test2", // Should be ignored (no image)
-              title: "Just a text post [TMDB: 550]",
-              url: "https://reddit.com",
-              author: "testuser2",
-              score: 10,
-              link_flair_text: null,
-              permalink: "/r/SpatialPosters/comments/test2/"
-             }
-          }
-        ]
-      }
-    }
+  it("should parse the Reddit RSS feed correctly", async () => {
+    // Il servizio usa il feed Atom/RSS (search.rss), non l'API JSON.
+    const rss = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
+  <entry>
+    <author><name>/u/testuser</name></author>
+    <id>t3_test1</id>
+    <title>Fight Club (1999) Clean [TMDB: 550]</title>
+    <content type="html">&lt;a href=&quot;https://i.redd.it/test.jpg&quot;&gt;[link]&lt;/a&gt;</content>
+  </entry>
+  <entry>
+    <author><name>/u/testuser2</name></author>
+    <id>t3_test2</id>
+    <title>Just a text post [TMDB: 550]</title>
+    <content type="html">no image here</content>
+  </entry>
+  <entry>
+    <author><name>/u/testuser3</name></author>
+    <id>t3_test3</id>
+    <title>Other movie [TMDB: 5501]</title>
+    <content type="html">&lt;a href=&quot;https://i.redd.it/other.jpg&quot;&gt;[link]&lt;/a&gt;</content>
+  </entry>
+</feed>`
 
     global.fetch = vi.fn().mockResolvedValueOnce({
       ok: true,
-      json: async () => mockRedditResponse
+      text: async () => rss
     })
 
-    const posters = await fetchRedditPosters("550")
-    
-    // Should only return the valid image post
+    const posters = await fetchRedditPosters("550", true)
+
+    // Only the image post tagged with exactly this TMDB id
     expect(posters.length).toBe(1)
-    expect(posters[0].id).toBe("test1")
+    expect(posters[0].id).toBe("t3_test1")
     expect(posters[0].url).toBe("https://i.redd.it/test.jpg")
+    expect(posters[0].author).toBe("testuser")
     expect(posters[0].flair).toBe("Clean Poster")
-    expect(posters[0].upvotes).toBe(150)
   })
 })

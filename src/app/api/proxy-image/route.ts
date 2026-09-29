@@ -1,24 +1,8 @@
 import { NextRequest } from "next/server"
 import { fetchImg } from "@/lib/poster-render-helpers"
+import { resolveAndCheckBlocked } from "@/lib/safe-fetch"
 
 export const maxDuration = 30
-
-function isPrivateHostname(hostname: string): boolean {
-  const h = hostname.toLowerCase()
-  if (h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0" || h === "::1" || h.endsWith(".local") || h.endsWith(".internal")) {
-    return true
-  }
-  // Check private IP ranges
-  if (/^10\./.test(h) || /^192\.168\./.test(h) || /^169\.254\./.test(h)) {
-    return true
-  }
-  const match172 = /^172\.(\d+)\./.exec(h)
-  if (match172) {
-    const octet = parseInt(match172[1], 10)
-    if (octet >= 16 && octet <= 31) return true
-  }
-  return false
-}
 
 export async function GET(req: NextRequest) {
   const rawUrl = req.nextUrl.searchParams.get("url")
@@ -37,7 +21,7 @@ export async function GET(req: NextRequest) {
     return new Response("Only HTTP/HTTPS URLs supported", { status: 400 })
   }
 
-  if (isPrivateHostname(parsed.hostname)) {
+  if (await resolveAndCheckBlocked(parsed.toString())) {
     return new Response("Access to private/internal hosts forbidden", { status: 403 })
   }
 

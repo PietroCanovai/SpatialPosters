@@ -1,11 +1,12 @@
-import dns, { type LookupOptions } from "node:dns"
-import { createRequire } from "node:module"
 import { NextRequest } from "next/server"
 import { getOriginFromRequest } from "@/lib/poster-public-url"
 import { rewriteMetasPosters, rewriteSingleMetaPoster, type StremioItemMeta } from "@/lib/addon-proxy"
 import { rateLimit, rateLimitKey, rateLimitResponse } from "@/lib/rate-limit"
 import { createLogger } from "@/lib/logger"
 import { envWithFallback } from "@/lib/env-compat"
+import { pinnedFetch, resolveAndCheckBlocked } from "@/lib/safe-fetch"
+
+export { isIpv4Literal, isPrivateHost } from "@/lib/safe-fetch"
 
 const log = createLogger("addon-proxy")
 
@@ -43,137 +44,6 @@ function redactUrlForLog(urlStr: string): string {
   }
 }
 
-/** Un hostname è un letterale IPv4 (es. 10.0.0.1) e non un nome DNS. */
-export function isIpv4Literal(hostname: string): boolean {
-  return /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)
-}
-
-/** Blocca richieste a IP privati / localhost per prevenire SSRF.
- *
- * Importante: i check sui prefissi IP (RFC 1918, fc00::/7, fe80::/10, …) si
- * applicano SOLO ai letterali IP. Un nome DNS come "fcbarcelona.com" non deve
- * essere bloccato solo perché inizia con "fc": per i nomi DNS la protezione
- * arriva dal resolve (resolveAndCheckBlocked/isPrivateIp sugli indirizzi
- * risolti), non da un match di prefisso sul testo.
- */
-export function isPrivateHost(hostname: string): boolean {
-  const h = hostname.toLowerCase()
-  if (h === "localhost") return true
-  if (h.endsWith(".local") || h.endsWith(".internal")) return true
-
-  // Letterale IPv6 — rimuovi le parentesi per un match uniforme.
-  if (h.includes(":")) {
-    const bare = h.replace(/^\[|\]$/g, "")
-    return (
-      bare === "::1" || bare === "::" ||           // loopback / unspecified
-      bare.startsWith("::ffff:") ||                // IPv4-mapped IPv6
-      bare.startsWith("fc") || bare.startsWith("fd") ||  // fc00::/7 ULA
-      /^fe[89ab]/.test(bare)                       // fe80::/10 link-local
-    )
-  }
-
-  // Letterale IPv4 — i check RFC 1918 / link-local valgono solo qui.
-  if (isIpv4Literal(h)) {
-    return (
-      /^127\./.test(h) ||                          // loopback 127.0.0.0/8
-      h === "0.0.0.0" ||
-      h.startsWith("10.") ||                       // RFC 1918 10.0.0.0/8
-      h.startsWith("192.168.") ||                  // RFC 1918 192.168.0.0/16
-      /^172\.(1[6-9]|2\d|3[01])\./.test(h) ||      // RFC 1918 172.16.0.0/12
-      /^169\.254\./.test(h)                        // link-local
-    )
-  }
-
-  // Nome DNS: mai bloccato dal testo, sarà valutato sugli IP risolti.
-  return false
-}
-
-/** Verifica se un indirizzo IP risolto (IPv4 o IPv6) è privato/non routabile. */
-function isPrivateIp(address: string): boolean {
-  const lower = address.toLowerCase()
-  if (lower === "::1" || lower === "::" || lower === "[::1]" || lower === "[::]") return true
-  if (lower.startsWith("::ffff:") || lower.startsWith("0:0:0:0:0:ffff:")) {
-    // IPv4-mapped IPv6: estrai il quad e valutalo come IPv4
-    const v4 = lower.split(":").pop() || ""
-    if (isPrivateHost(v4)) return true
-    return /^127\./.test(v4) || v4 === "0.0.0.0"
-  }
-  if (lower.startsWith("fc") || lower.startsWith("fd")) return true // ULA fc00::/7
-  if (lower.startsWith("fe8") || lower.startsWith("fe9") || lower.startsWith("fea") || lower.startsWith("feb")) return true // link-local
-  if (isPrivateHost(lower)) return true
-  return false
-}
-
-
-/**
- * Risolve un hostname a IP (entrambe le famiglie) e verifica che nessuno sia privato.
- * Protegge da:
- * - DNS rebinding (il controllo viene fatto dopo la risoluzione DNS)
- * - IP alternativi (decimali, hex, IPv4-mapped IPv6)
- * - Hostname locali
- * - IPv6 (fetch/undici usa Happy Eyeballs: può connettersi via AAAA anche se il check
- *   considera solo A — quindi dobbiamo bloccare se QUALSIASI indirizzo risolto è privato)
- */
-async function resolveAndCheckBlocked(url: string): Promise<boolean> {
-  try {
-    const parsed = new URL(url)
-    const hostname = parsed.hostname.toLowerCase()
-    // Controllo rapido su hostname prima di risolvere
-    if (isPrivateHost(hostname)) return true
-    // Risolvi a IP per prevenire bypass con rappresentazioni alternative.
-    // family 0 + all: tutte le family, tutti gli IP. Blocca se uno qualsiasi è privato.
-    const addresses = await dns.promises.lookup(hostname, { family: 0, all: true })
-    for (const entry of addresses) {
-      if (isPrivateIp(entry.address)) return true
-    }
-    return false
-  } catch {
-    return true // in caso di errore DNS, blocca per sicurezza
-  }
-}
-
-/**
- * Lookup DNS personalizzato per l'Agent undici: risolve il hostname e restituisce
- * SOLO gli indirizzi pubblici. Chiude il TOCTOU di resolveAndCheckBlocked: la
- * connessione avviene esattamente sugli IP verificati, senza finestra di
- * DNS-rebinding tra check e fetch. Se nessun indirizzo è pubblico → errore.
- */
-function safeLookup(hostname: string, options: LookupOptions, callback: (err: NodeJS.ErrnoException | null, address: dns.LookupAddress[] | string, family?: number) => void) {
-  dns.promises
-    .lookup(hostname, { family: 0, all: true })
-    .then((addresses) => {
-      const safe = addresses.filter((a) => !isPrivateIp(a.address))
-      if (safe.length === 0) {
-        callback(new Error(`Blocked SSRF: no public IP for ${hostname}`), [])
-        return
-      }
-      if (options.all) {
-        callback(null, safe)
-      } else {
-        callback(null, safe[0].address, safe[0].family)
-      }
-    })
-    .catch((err: NodeJS.ErrnoException) => callback(err, []))
-}
-
-/** Agent undici con lookup vincolato agli IP pubblici (DNS pin) — lazy per non rompere la build su Node 20 (undici 8 richiede >=22.19: markAsUncloneable). */
-let safeAgent: InstanceType<typeof import("undici").Agent> | undefined
-let safeAgentTried = false
-function getSafeAgent(): InstanceType<typeof import("undici").Agent> | undefined {
-  if (safeAgentTried) return safeAgent
-  safeAgentTried = true
-  try {
-    const require = createRequire(import.meta.url)
-    const { Agent } = require("undici") as typeof import("undici")
-    safeAgent = new Agent({ connect: { lookup: safeLookup } })
-  } catch (e) {
-    log.warn("undici Agent unavailable — DNS pin disabilitato, fallback a fetch senza dispatcher", {
-      error: e instanceof Error ? e.message : String(e),
-    })
-    safeAgent = undefined
-  }
-  return safeAgent
-}
 
 /** Allowlist opzionale di domini proxy (PICTORIUM_PROXY_ALLOW_DOMAINS). */
 export function isAllowedByAllowlist(url: URL): boolean {
@@ -248,18 +118,9 @@ async function safeFetch(url: string, options: RequestInit & { signal: AbortSign
       log.warn("Blocked by proxy allowlist", { target: redactUrlForLog(currentUrl) })
       return Response.json({ error: "Target domain not allowed" }, { status: 403, headers: corsHeaders() })
     }
-    // La fetch globale di Node (undici) accetta `dispatcher`; il lib DOM di
-    // Next non lo tipizza, quindi il cast è necessario. Il dispatcher vincola
-    // la connessione agli IP pubblici verificati (DNS pin) — se undici non è
-    // caricabile (Node 20 + undici 8) si usa fetch senza dispatcher +
-    // resolveAndCheckBlocked già fatto sopra.
-    const dispatcher = getSafeAgent()
-    const fetchOpts = {
-      ...options,
-      redirect: "manual",
-      ...(dispatcher ? { dispatcher } : {}),
-    } as unknown as RequestInit
-    const res = await fetch(currentUrl, fetchOpts)
+    // Connessione vincolata agli IP pubblici verificati (DNS pin), redirect
+    // manuali validati qui sotto.
+    const res = await pinnedFetch(currentUrl, options)
     if (res.status < 300 || res.status >= 400) return res
     // Redirect — validiamo la destinazione
     const location = res.headers.get("location")

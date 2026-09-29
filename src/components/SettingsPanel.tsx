@@ -39,7 +39,6 @@ import {
   X,
   Lock,
   KeyRound,
-  Heart,
 } from "lucide-react"
 
 interface Props {
@@ -1093,17 +1092,7 @@ export function SettingsPanel({ setSettingsOpen, exportData, importData, mobile,
 
   // Sticky Actions Footer
   const footer = (
-    <div className={`border-t border-white/10 bg-[#0d0d10]/95 backdrop-blur-md px-4 sm:px-6 py-3 flex items-center gap-3 shrink-0 ${setSettingsOpen ? "justify-between" : "justify-end"}`}>
-      <a
-        href="https://patreon.com/theaceofficials"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition-all active:scale-95"
-      >
-        <Heart className="w-3.5 h-3.5 text-rose-400 fill-rose-500/30" />
-        <span className="hidden sm:inline">Support @TheAceOfficials</span>
-        <span className="sm:hidden">Patreon</span>
-      </a>
+    <div className={`border-t border-white/10 bg-[#0d0d10]/95 backdrop-blur-md px-4 sm:px-6 py-3 flex items-center gap-3 shrink-0 justify-end`}>
       <div className="flex items-center gap-2">
         {setSettingsOpen && (
           <button
