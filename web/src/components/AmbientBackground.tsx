@@ -4,7 +4,7 @@ import { memo } from "react"
 import { usePSelector } from "@/lib/context"
 
 export const AmbientBackground = memo(function AmbientBackground() {
-  const accentColor = usePSelector((v) => v.accentColor)
+  const accentColor = usePSelector((v) => v.accentColor || v.autoAccentColor)
 
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 select-none aria-hidden:true">

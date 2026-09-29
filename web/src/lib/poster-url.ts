@@ -139,7 +139,9 @@ export function buildPreviewUrl(ps: PosterState, bp: BadgeParams): string {
       params.push(`oy=${ps.logoOffsetY}`)
     }
   }
-  if (ps.posterScale && ps.posterScale !== 100) {
+  // Sempre espliciti: se mancassero, il server userebbe i valori del design
+  // salvato (o della variante del poster) invece di quelli dell'editor.
+  if (ps.posterScale !== undefined) {
     params.push(`pscale=${Math.round(ps.posterScale)}`)
     params.push(`pox=${Math.round(ps.posterOffsetX ?? 0)}`)
     params.push(`poy=${Math.round(ps.posterOffsetY ?? 0)}`)
@@ -158,14 +160,14 @@ export function buildPreviewUrl(ps: PosterState, bp: BadgeParams): string {
   params.push(`bd=${bp.blurDarkness}`)
   params.push(`bs=${bp.badgeStyle}`)
   params.push(`rs=${bp.rankingBadgeStyle}`)
-  if (!bp.blurEnabled) params.push("be=0")
+  params.push(`be=${bp.blurEnabled ? "1" : "0"}`)
   params.push(`netLogo=${bp.networkLogo !== false ? "1" : "0"}`)
   // Fix M2: side viene emesso SEMPRE (left|right) — prima soltanto "right";
   // senza il parametro il server risolve dal mapping/config salvati (di
   // default right in modalità Stremio) e la preview rendeva a destra anche
   // quando l'editor mostra lo stato sinistra.
   if (bp.ribbonSide) params.push(`side=${bp.ribbonSide}`)
-  if (ps.accentColor) params.push(`ac=${encodeURIComponent(ps.accentColor)}`)
+  params.push(`ac=${ps.accentColor ? encodeURIComponent(ps.accentColor) : "auto"}`)
   // Fix M16: tl è inviato SOLO a calcolo completato: con topEdgeColor null
   // (colore non ancora campionato) la preview forzava tl=1 (testo chiaro)
   // anche quando il server avrebbe calcolato scuro — ora il server decide.

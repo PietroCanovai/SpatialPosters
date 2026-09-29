@@ -20,7 +20,7 @@ const PinLockModal = dynamic(() => import("@/components/PinLockModal").then((m) 
  * cronologia reale.
  */
 export function AppShell({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
-  const accentColor = usePSelector((v) => v.accentColor)
+  const accentColor = usePSelector((v) => v.accentColor || v.autoAccentColor)
   const serviceErrors = usePSelector((v) => v.serviceErrors)
   const showLangPicker = usePSelector((v) => v.showLangPicker)
   const setShowLangPicker = usePSelector((v) => v.setShowLangPicker)

@@ -1,6 +1,28 @@
 import { z } from "zod"
 import { BADGE_STYLES, RANKING_BADGE_STYLES } from "./badge-styles"
 
+const logoVariantSchema = z.object({
+  logoScale: z.number().int().min(10).max(200).nullable().optional(),
+  logoOffsetX: z.number().int().min(-2000).max(2000).nullable().optional(),
+  logoOffsetY: z.number().int().min(-3000).max(3000).nullable().optional(),
+})
+
+const posterVariantSchema = z.object({
+  posterScale: z.number().int().min(100).max(300).nullable().optional(),
+  posterOffsetX: z.number().int().min(-2000).max(2000).nullable().optional(),
+  posterOffsetY: z.number().int().min(-3000).max(3000).nullable().optional(),
+  accentColor: z.string().regex(/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/).nullable().optional(),
+  gradientHeight: z.number().min(0).max(100).nullable().optional(),
+  blurEnabled: z.boolean().nullable().optional(),
+  blurIntensity: z.number().min(0).max(100).nullable().optional(),
+  blurFade: z.number().min(0).max(100).nullable().optional(),
+  blurDarkness: z.number().min(0).max(100).nullable().optional(),
+  logoPath: z.string().max(500).nullable().optional(),
+  logos: z.record(z.string().max(500), logoVariantSchema)
+    .refine((v) => Object.keys(v).length <= 60, "Too many logo variants")
+    .optional(),
+})
+
 export const mappingSchema = z.object({
   tmdbId: z.number().int().positive(),
   mediaType: z.enum(["movie", "tv"]),
@@ -15,6 +37,9 @@ export const mappingSchema = z.object({
   posterScale: z.number().int().min(100).max(300).nullable().optional(),
   posterOffsetX: z.number().int().min(-2000).max(2000).nullable().optional(),
   posterOffsetY: z.number().int().min(-3000).max(3000).nullable().optional(),
+  variants: z.record(z.string().max(500), posterVariantSchema)
+    .refine((v) => Object.keys(v).length <= 200, "Too many poster variants")
+    .optional(),
   showBadges: z.boolean().nullable().optional(),
   rankingBadges: z.boolean().nullable().optional(),
   badgeGenre: z.boolean().nullable().optional(),

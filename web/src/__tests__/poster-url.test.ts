@@ -279,9 +279,15 @@ describe("buildPreviewUrl", () => {
     expect(url).toContain("ac=%23ff0000")
   })
 
-  it("does not include ac param when accentColor is default", () => {
+  it("sends ac=auto without a custom accent, so a saved/per-poster colour can't leak into the preview", () => {
     const url = buildPreviewUrl({ ...basePosterState, accentColor: null }, baseBadgeParams)
-    expect(url).not.toContain("ac=")
+    expect(url).toContain("ac=auto")
+  })
+
+  it("always sends the poster transform and blur state explicitly", () => {
+    const url = buildPreviewUrl({ ...basePosterState, posterScale: 100, posterOffsetX: 0, posterOffsetY: 0 }, { ...baseBadgeParams, blurEnabled: true })
+    expect(url).toContain("pscale=100")
+    expect(url).toContain("be=1")
   })
 
   it("includes badges=1 when globalBadges is true", () => {

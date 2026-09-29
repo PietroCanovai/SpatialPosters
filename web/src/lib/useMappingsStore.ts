@@ -7,6 +7,10 @@ import { t } from "./i18n"
 
 export function useMappingsStore() {
   const [mappings, setMappings] = useState<Mapping[]>([])
+  // true dopo il primo caricamento (riuscito o no): l'editor deve aspettarlo,
+  // altrimenti aprendo /movie/[id] direttamente il titolo sembrerebbe senza
+  // design e "Send" sovrascriverebbe quello salvato con i default.
+  const [mappingsLoaded, setMappingsLoaded] = useState(false)
 
   const mappingsMap = useMemo(() => {
     const map = new Map<string, Mapping>()
@@ -22,7 +26,8 @@ export function useMappingsStore() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setMappings(Array.isArray(data.mappings) ? data.mappings : [])
-    } catch (e) { console.error("[pictorium] Failed to load mappings:", e) }
+    } catch (e) { console.error("[spatialposters] Failed to load mappings:", e) }
+    finally { setMappingsLoaded(true) }
   }, [])
 
   useEffect(() => { loadMappings() }, [loadMappings])
@@ -83,5 +88,5 @@ export function useMappingsStore() {
     input.click()
   }, [loadMappings])
 
-  return { mappings, setMappings, mappingsMap, loadMappings, removeMapping, exportData, importData }
+  return { mappings, setMappings, mappingsMap, mappingsLoaded, loadMappings, removeMapping, exportData, importData }
 }

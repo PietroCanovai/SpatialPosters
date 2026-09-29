@@ -59,6 +59,7 @@ import { computeTopBadge } from "@/lib/poster-badge"
 import { resolveImdbToTmdb } from "@/lib/imdb-resolver"
 import { createLogger } from "@/lib/logger"
 import { resolvePosterRenderConfig, resolvePosterTransform, posterCropWindow } from "@/lib/poster-config"
+import { applyPosterVariant } from "@/lib/poster-variants"
 import { selectBestLogo, logoBestLogoFallbackReason } from "@/lib/logo-selection"
 
 
@@ -370,6 +371,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
     const isMappingClean = mapping.language === null
     const effectiveMappingLogo = isMappingClean && !mapping.logoDisabled ? mapping.logoPath : null
     logoPath = queryLogo || effectiveMappingLogo
+    // Ogni poster può avere il proprio logo (variante): vale anche per i poster in rotazione.
+    const posterVariant = posterPath ? mapping.variants?.[posterPath] : undefined
+    if (!queryLogo && posterVariant && posterVariant.logoPath !== undefined && !mapping.logoDisabled) {
+      logoPath = posterVariant.logoPath
+    }
     if (!isMappingClean) logoPath = null
     backdropPath = queryBackdrop || mapping?.backdropPath || null
     backdropScale = mapping?.backdropScale ?? 100
@@ -734,7 +740,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
     const finalRank = qRank !== null ? (parseInt(qRank, 10) >= 0 ? parseInt(qRank, 10) : rankingRank) : rankingRank
 
     // 6. Resize poster + compute luminance
-    const posterTransform = resolvePosterTransform(req.nextUrl.searchParams, mapping)
+    // Mapping effettivo per QUESTO poster/logo: la variante del poster (trasformazione,
+    // colori, blur, scala/posizione del logo) vince sui campi di primo livello.
+    const renderMapping = applyPosterVariant(mapping, posterPath, logoPath)
+    const posterTransform = resolvePosterTransform(req.nextUrl.searchParams, renderMapping)
     const crop = posterCropWindow(STD_W, STD_H, posterTransform)
     const posterBuf = posterTransform.posterScale === 100
       ? await sharp(originalBuf).resize(STD_W, STD_H, { fit: 'cover', position: 'centre' }).toBuffer()
@@ -793,7 +802,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
     // 7. Parse blur / badge / logo config from query
     const renderConfig = resolvePosterRenderConfig({
       searchParams: req.nextUrl.searchParams,
-      mapping,
+      mapping: renderMapping,
       sd,
       hasQuery: !!queryPoster || !!mapping,
       showBadges,
@@ -819,11 +828,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
     const targetCenter = Math.round(30 * STD_H / 570)
 
     // 8. Pre-resolve accent color override
+    // ac=auto (preview): colore automatico anche se il design salvato ne ha uno.
     const qAc = req.nextUrl.searchParams.get("ac")
     const accentOverride = (qAc && isValidHex(qAc))
       ? { genreColor: qAc, rankColor: qAc }
-      : mapping?.accentColor
-        ? { genreColor: mapping.accentColor, rankColor: mapping.accentColor }
+      : qAc !== "auto" && renderMapping?.accentColor
+        ? { genreColor: renderMapping.accentColor, rankColor: renderMapping.accentColor }
         : null
 
     // 9. Debug mode — return JSON with all computed data instead of rendering

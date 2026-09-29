@@ -43,6 +43,7 @@ export const MOCK_CTX: PictoriumCtx = {
   removeMapping: asyncStubFn,
   mappingsMap: new Map(),
   openPoster: stubFn,
+  mappingsLoaded: true,
   navigateToPoster: stubFn,
   refreshLists: asyncStubFn,
   refreshPosters: asyncStubFn,

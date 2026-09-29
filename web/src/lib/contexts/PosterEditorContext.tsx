@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useMemo, useCallback } from "react"
-import type { TMDBImage } from "@/lib/types"
+import type { TMDBImage, PosterVariant } from "@/lib/types"
 import { useDefaults } from "@/lib/useDefaults"
 import type { BadgeStyle, RankingBadgeStyle } from "@/lib/badge-styles"
 
@@ -122,6 +122,9 @@ export interface PosterEditorCtx {
   setPosterOffsetX: (v: number | ((prev: number) => number)) => void
   posterOffsetY: number
   setPosterOffsetY: (v: number | ((prev: number) => number)) => void
+  /** Impostazioni per singolo poster del titolo aperto (vedi lib/poster-variants.ts). */
+  posterVariants: Record<string, PosterVariant>
+  setPosterVariants: (v: Record<string, PosterVariant> | ((prev: Record<string, PosterVariant>) => Record<string, PosterVariant>)) => void
   // ---- Backdrop ----
   backdrops: TMDBImage[]
   setBackdrops: (v: TMDBImage[] | ((prev: TMDBImage[]) => TMDBImage[])) => void
@@ -178,6 +181,7 @@ export function PosterEditorProvider({
   const [posterScale, setPosterScale] = useState(100)
   const [posterOffsetX, setPosterOffsetX] = useState(0)
   const [posterOffsetY, setPosterOffsetY] = useState(0)
+  const [posterVariants, setPosterVariants] = useState<Record<string, PosterVariant>>({})
 
   // ---- Backdrop state ----
   const [backdrops, setBackdrops] = useState<TMDBImage[]>([])
@@ -528,6 +532,8 @@ export function PosterEditorProvider({
       setPosterOffsetX,
       posterOffsetY,
       setPosterOffsetY,
+      posterVariants,
+      setPosterVariants,
 
       // Backdrop
       backdrops,
@@ -615,6 +621,7 @@ export function PosterEditorProvider({
       posterScale, setPosterScale,
       posterOffsetX, setPosterOffsetX,
       posterOffsetY, setPosterOffsetY,
+      posterVariants, setPosterVariants,
 
       // Backdrop
       backdrops, setBackdrops,

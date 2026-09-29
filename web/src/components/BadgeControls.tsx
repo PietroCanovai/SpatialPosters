@@ -348,7 +348,7 @@ export function BadgeControls() {
             options={["default", "colored", "pill"]}
             onChange={ed.setRankingBadgeStyle}
             t={t}
-            accentColor={accentColor}
+            accentColor={accentColor || autoAccentColor}
           />
         </div>
       </div>
@@ -367,7 +367,7 @@ export function BadgeControls() {
           options={["shadow", "pill", "bar", "colored", "bordo", "vetro"]}
           onChange={ed.setBadgeStyle}
           t={t}
-          accentColor={accentColor}
+          accentColor={accentColor || autoAccentColor}
         />
 
         <div className="flex items-center justify-between gap-2 pt-2 border-t border-surface2/50">
@@ -392,8 +392,7 @@ export function BadgeControls() {
               <button
                 type="button"
                 onClick={() => {
-                  if (autoAccentColor) setAccentColor(autoAccentColor)
-                  else setAccentColor(null)
+                  setAccentColor(null)
                 }}
                 className="text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors px-1.5 py-0.5 rounded bg-surface2/50 border border-surface2 hover:bg-surface2"
                 title={t("ui.resetAutoColor")}

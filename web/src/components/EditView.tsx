@@ -24,7 +24,7 @@ type RightTab = "logo" | "badge" | "transform"
 
 /** Editor del poster di un titolo (route /movie/[id] e /tv/[id]). */
 export default function EditView() {
-  const accentColor = usePSelector((v) => v.accentColor)
+  const accentColor = usePSelector((v) => v.accentColor || v.autoAccentColor)
   const loadingImages = usePSelector((v) => v.loadingImages)
   const logos = usePSelector((v) => v.logos)
   const mappingsMap = usePSelector((v) => v.mappingsMap)

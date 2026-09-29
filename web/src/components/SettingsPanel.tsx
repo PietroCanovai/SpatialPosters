@@ -50,7 +50,7 @@ interface Props {
 }
 
 export function SettingsPanel({ setSettingsOpen, exportData, importData, mobile, embedded }: Props) {
-  const accentColor = usePSelector((v) => v.accentColor)
+  const accentColor = usePSelector((v) => v.accentColor || v.autoAccentColor)
   const uiAccent = usePSelector((v) => v.uiAccent)
   const setUiAccent = usePSelector((v) => v.setUiAccent)
   const selected = usePSelector((v) => v.selected)

@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation"
 import { useMappingsStore } from "./useMappingsStore"
 import { usePosterEditor, PosterEditorProvider } from "./contexts/PosterEditorContext"
 import { usePosterSave } from "./usePosterSave"
+import { storeVariant, type PosterEditorSnapshot } from "./poster-variants"
 import { defaultGradientHeightForPoster } from "./gradient-defaults"
 import { computeLogoOffsetBounds } from "./logo-layout"
 import { useOutsideDismiss } from "./useOutsideDismiss"
@@ -92,6 +93,8 @@ export interface SpatialCtx {
   navigateToPoster: (item: SearchResult) => void
   /** Carica il titolo nell'editor della pagina corrente (usato da /movie/[id] e /tv/[id]). */
   openPoster: (item: SearchResult) => void
+  /** I design salvati sono stati caricati (aprire un titolo prima darebbe i default). */
+  mappingsLoaded: boolean
   refreshLists: () => Promise<void>
   tmdbKey: string
   setQuery: React.Dispatch<React.SetStateAction<string>>
@@ -281,7 +284,7 @@ export function usePictorium(): PictoriumCtx {
   const trending = useTrending(tmdbKey, mdblistApiKey, editorCtx.defaultRegion)
   const tmdbLang = getRegionDef(editorCtx.defaultRegion).lang
   const search = useSearch(tmdbKey, tmdbLang)
-  const { mappings, mappingsMap, loadMappings, removeMapping, exportData, importData } = useMappingsStore()
+  const { mappings, mappingsMap, mappingsLoaded, loadMappings, removeMapping, exportData, importData } = useMappingsStore()
   const {
     // Badges
     globalBadges, setGlobalBadges,
@@ -330,6 +333,7 @@ export function usePictorium(): PictoriumCtx {
     logoOffsetY, setLogoOffsetY,
     logoDisabled, setLogoDisabled,
     // Poster transform
+    posterVariants, setPosterVariants,
     posterScale, setPosterScale,
     posterOffsetX, setPosterOffsetX,
     posterOffsetY, setPosterOffsetY,
@@ -373,9 +377,10 @@ export function usePictorium(): PictoriumCtx {
   // si ritintano col poster in editing. Senza poster: fallback arancione.
   useEffect(() => {
     const root = document.documentElement
-    if (uiAccent && accentColor) root.style.setProperty("--color-accent", accentColor)
+    const uiColor = accentColor || autoAccentColor
+    if (uiAccent && uiColor) root.style.setProperty("--color-accent", uiColor)
     else root.style.removeProperty("--color-accent")
-  }, [uiAccent, accentColor])
+  }, [uiAccent, accentColor, autoAccentColor])
   const [topEdgeColor, setTopEdgeColor] = useState<string | null>(null)
   const [serviceErrors, setServiceErrors] = useState<Record<string, boolean>>({})
 
@@ -755,6 +760,7 @@ export function usePictorium(): PictoriumCtx {
       setLogoDisabled(existing.logoDisabled ?? false)
       setLogoOffsetX(existing.logoOffsetX ?? 0)
       setLogoOffsetY(existing.logoOffsetY ?? 0)
+      setPosterVariants(existing.variants ?? {})
       setPosterScale(existing.posterScale ?? 100)
       setPosterOffsetX(existing.posterOffsetX ?? 0)
       setPosterOffsetY(existing.posterOffsetY ?? 0)
@@ -785,6 +791,7 @@ export function usePictorium(): PictoriumCtx {
       setLogoDisabled(false)
       setLogoOffsetX(0)
       setLogoOffsetY(0)
+      setPosterVariants({})
       setPosterScale(100)
       setPosterOffsetX(0)
       setPosterOffsetY(0)
@@ -881,7 +888,7 @@ export function usePictorium(): PictoriumCtx {
     setSelectedLogo: navigation.setSelectedLogo, setPreviewPoster: navigation.setPreviewPoster, setPreviewId: navigation.setPreviewId,
     posters: navigation.posters, metaInfo, trendRank, mdblistAnimeList: trending.mdblistAnimeList,
     mappingsMap, loadMappings, logoScale, logoOffsetX, logoOffsetY,
-    posterScale, posterOffsetX, posterOffsetY,
+    posterScale, posterOffsetX, posterOffsetY, posterVariants, setPosterVariants,
     selectedBackdrop, setSelectedBackdrop: setSelectedBackdrop, backdropScale, backdropOffsetX, backdropOffsetY,
     setBackdropScale, setBackdropOffsetX, setBackdropOffsetY,
     globalBadges, rankingBadges, customBadge, badgeStyle, rankingBadgeStyle,
@@ -891,6 +898,73 @@ export function usePictorium(): PictoriumCtx {
     rotationPosters, autoRotateClean, defaultAutoRotateClean, excludedPosters, accentColor, logoDisabled, setLogoDisabled,
     setLogoScale, setLogoOffsetX, setLogoOffsetY, networkLogo, ribbonSide, lang, episodeGroupId,
   })
+
+  // --- Configurazione per singolo poster -----------------------------------
+  // Cambiando poster si salva lo stato del poster corrente nella sua variante e
+  // si ripristina quella del nuovo (o i default). Cambiando logo, lo stesso per
+  // la coppia poster+logo. Lo stato è letto al momento del click (ref), non da
+  // un effetto: così non c'è rischio di scrivere i valori del poster vecchio in
+  // quello nuovo.
+  const variantImplRef = useRef<{ selectPoster: (img: TMDBImage) => Promise<void>; selectLogo: (logo: TMDBImage) => Promise<void> }>(null!)
+  variantImplRef.current = {
+    selectPoster: async (image: TMDBImage) => {
+      const currentPath = navigation.previewPoster?.file_path
+      if (image.file_path === currentPath) return selectPoster(image)
+      const snapshot: PosterEditorSnapshot = {
+        posterScale, posterOffsetX, posterOffsetY, accentColor, gradientHeight,
+        blurEnabled, blurIntensity, blurFade, blurDarkness,
+        logoPath: logoDisabled ? null : (navigation.selectedLogo?.file_path ?? null),
+        logoScale, logoOffsetX, logoOffsetY,
+      }
+      const variants = currentPath ? storeVariant(posterVariants, currentPath, snapshot) : posterVariants
+      setPosterVariants(variants)
+      await selectPoster(image) // imposta poster + sfumatura di default per il poster
+      const v = variants[image.file_path]
+      setPosterScale(v?.posterScale ?? 100)
+      setPosterOffsetX(v?.posterOffsetX ?? 0)
+      setPosterOffsetY(v?.posterOffsetY ?? 0)
+      setAccentColor(v?.accentColor ?? null)
+      if (v?.gradientHeight != null) setGradientHeight(v.gradientHeight)
+      setBlurEnabled(v?.blurEnabled ?? defaultBlurEnabled)
+      setBlurIntensity(v?.blurIntensity ?? defaultBlurIntensity)
+      setBlurFade(v?.blurFade ?? defaultBlurFade)
+      setBlurDarkness(v?.blurDarkness ?? defaultBlurDarkness)
+      // Logo di questo poster: quello scelto per lui, altrimenti si tiene il logo corrente.
+      let logo = navigation.selectedLogo
+      if (v && v.logoPath !== undefined) {
+        logo = v.logoPath ? (navigation.logos.find((l) => l.file_path === v.logoPath) ?? logo) : null
+        navigation.setSelectedLogo(logo)
+        if (logo) setLogoDisabled(false)
+      }
+      const lv = logo ? v?.logos?.[logo.file_path] : undefined
+      setLogoScale(lv?.logoScale ?? (logo ? (logoDefaultScale(logo) ?? 75) : 75))
+      setLogoOffsetX(lv?.logoOffsetX ?? 0)
+      setLogoOffsetY(lv?.logoOffsetY ?? 0)
+    },
+    selectLogo: async (logo: TMDBImage) => {
+      const posterPath = navigation.previewPoster?.file_path
+      const current = navigation.selectedLogo
+      let variants = posterVariants
+      if (posterPath && current && !logoDisabled) {
+        // Ricorda dove stava il logo corrente su questo poster prima di cambiarlo.
+        variants = storeVariant(posterVariants, posterPath, {
+          posterScale, posterOffsetX, posterOffsetY, accentColor, gradientHeight,
+          blurEnabled, blurIntensity, blurFade, blurDarkness,
+          logoPath: current.file_path, logoScale, logoOffsetX, logoOffsetY,
+        })
+        setPosterVariants(variants)
+      }
+      await selectLogo(logo) // scala di default, offset 0
+      const lv = posterPath ? variants[posterPath]?.logos?.[logo.file_path] : undefined
+      if (lv) {
+        if (lv.logoScale != null) setLogoScale(lv.logoScale)
+        if (lv.logoOffsetX != null) setLogoOffsetX(lv.logoOffsetX)
+        if (lv.logoOffsetY != null) setLogoOffsetY(lv.logoOffsetY)
+      }
+    },
+  }
+  const selectPosterWithVariant = useCallback((image: TMDBImage) => variantImplRef.current.selectPoster(image), [])
+  const selectLogoWithVariant = useCallback((logo: TMDBImage) => variantImplRef.current.selectLogo(logo), [])
 
   const saveConfig = useCallback(async (opts: { silent?: boolean } = {}) => {
     await savePosterConfig({ silent: opts.silent })
@@ -933,7 +1007,7 @@ export function usePictorium(): PictoriumCtx {
     previewUrl, urlPattern, lang,
     openSections, toggleSection: (key: string) => setOpenSections((prev) => ({ ...prev, [key]: !(prev[key] ?? true) })),
     posterScrollRef, posterScrollInfo, setPosterScrollInfo,
-    selectPoster, selectLogo, removeLogo,
+    selectPoster: selectPosterWithVariant, selectLogo: selectLogoWithVariant, removeLogo,
     logoBounds,
     selectBackdrop, removeBackdrop,
     trendRank,
@@ -944,6 +1018,7 @@ export function usePictorium(): PictoriumCtx {
     saveConfig, removeMapping, mappingsMap,
     navigateToPoster: (item: SearchResult) => { rememberItemSummary(item); nextRouter.push(editorHref(item)) },
     openPoster: (item: SearchResult) => { openPosterBrowserRef.current(item) },
+    mappingsLoaded,
     refreshLists: trending.refreshLists,
     refreshPosters,
     tmdbKey, setQuery: search.setQuery, doSearch: search.doSearch, loadMore: search.loadMore,
@@ -977,7 +1052,7 @@ export function usePictorium(): PictoriumCtx {
     trendRank, mdblistMatch, imdbTop250, metaInfo, navigation.previewId,
     selectPoster, selectLogo, saveConfig, removeLogo,
     mappingsMap, tmdbKey, search.query, search.results, search.searching, search.totalResults, search.totalPages, search.searchPage, search.recentSearches, search.clearRecentSearches,
-    mappings,
+    mappings, mappingsLoaded,
     langOpen, settingsOpen, showLangPicker,
     tmdbKeyInput, showKey, copied, mdblistApiKey,
     accentColor, autoAccentColor, setAccentColor,

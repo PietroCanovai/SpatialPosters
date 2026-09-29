@@ -19,7 +19,7 @@ export function useRootColors(
   previewPoster: TMDBImage | null,
   genreName: string | undefined,
   posterUrl: (path: string, size?: string) => string,
-  { setAccentColor, setAutoAccentColor, setTopEdgeColor }: RootColorsSetters,
+  { setAutoAccentColor, setTopEdgeColor }: RootColorsSetters,
 ): void {
   useEffect(() => {
     const root = document.documentElement
@@ -31,7 +31,7 @@ export function useRootColors(
       root.style.setProperty("--color-edge-r", "85")
       root.style.setProperty("--color-edge-g", "85")
       root.style.setProperty("--color-edge-b", "85")
-      setAccentColor(null); setAutoAccentColor?.(null); setTopEdgeColor(null); return
+      setAutoAccentColor?.(null); setTopEdgeColor(null); return
     }
     let cancelled = false
     const isExternal = previewPoster.file_path.startsWith("http://") || previewPoster.file_path.startsWith("https://")
@@ -51,7 +51,8 @@ export function useRootColors(
       root.style.setProperty("--color-edge-r", String(edgeR))
       root.style.setProperty("--color-edge-g", String(edgeG))
       root.style.setProperty("--color-edge-b", String(edgeB))
-      setAccentColor(c)
+      // accentColor resta il colore scelto dall'utente (null = automatico):
+      // qui si aggiorna solo quello automatico del poster corrente.
       setAutoAccentColor?.(c)
       setTopEdgeColor(edgeC)
     }

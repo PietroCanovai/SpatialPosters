@@ -17,14 +17,17 @@ function PosterEditorContent({ id, mediaType }: PosterEditorContainerProps) {
   const { t } = useT()
   const selected = usePSelector((v) => v.selected)
   const openPoster = usePSelector((v) => v.openPoster)
+  const mappingsLoaded = usePSelector((v) => v.mappingsLoaded)
 
   // La route definisce il titolo: caricalo nell'editor (riusando titolo/anno
   // del risultato cliccato, se disponibili, per mostrarli subito).
   useEffect(() => {
+    // Aspetta i design salvati: senza, il titolo si aprirebbe con i default.
+    if (!mappingsLoaded) return
     if (selected && selected.id === id && selected.media_type === mediaType) return
     const summary = recallItemSummary(mediaType, id)
     openPoster(summary ?? { id, media_type: mediaType, title: "", poster_path: null })
-  }, [id, mediaType, selected, openPoster])
+  }, [id, mediaType, selected, openPoster, mappingsLoaded])
 
   if (!selected || selected.id !== id) {
     return (

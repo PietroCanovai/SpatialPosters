@@ -66,6 +66,8 @@ export interface Mapping {
   posterScale?: number | null
   posterOffsetX?: number | null
   posterOffsetY?: number | null
+  /** Configurazione per singolo poster (chiave: file_path del poster). Vedi lib/poster-variants.ts. */
+  variants?: Record<string, PosterVariant>
   backdropPath?: string | null
   backdropScale?: number | null
   backdropOffsetX?: number | null
@@ -126,4 +128,28 @@ export interface CustomCatalogConfig {
   type: CustomCatalogType
   url: string
   enabled?: boolean
+}
+
+/** Scala/posizione di un logo su un poster specifico. */
+export interface LogoVariant {
+  logoScale?: number | null
+  logoOffsetX?: number | null
+  logoOffsetY?: number | null
+}
+
+/** Impostazioni che appartengono a un singolo poster del titolo. */
+export interface PosterVariant {
+  posterScale?: number | null
+  posterOffsetX?: number | null
+  posterOffsetY?: number | null
+  accentColor?: string | null
+  gradientHeight?: number | null
+  blurEnabled?: boolean | null
+  blurIntensity?: number | null
+  blurFade?: number | null
+  blurDarkness?: number | null
+  /** Logo scelto per questo poster (null = nessun logo). */
+  logoPath?: string | null
+  /** Scala/posizione per ogni logo provato su questo poster (chiave: file_path del logo). */
+  logos?: Record<string, LogoVariant>
 }
