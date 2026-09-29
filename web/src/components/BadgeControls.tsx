@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Check, XCircle, Ruler, Cloud, Minus, Circle, ChevronDown, Star, Trophy, Tv, Flame, Sparkles, Palette, Layers } from "lucide-react"
+import { Check, XCircle, Ruler, Cloud, Minus, Circle, ChevronDown, Star, Trophy, Tv, Sparkles, Palette, Layers } from "lucide-react"
 import { usePSelector } from "@/lib/context"
 import { useT } from "@/lib/contexts/TranslationContext"
 import { usePosterEditor } from "@/lib/contexts/PosterEditorContext"
@@ -238,36 +238,6 @@ export function BadgeControls() {
             <Toggle value={ed.networkLogo} onChange={(v) => ed.setNetworkLogo(v)} label={t("ui.networkLogo")} />
           </div>
 
-          <div className="flex items-center justify-between gap-2 pt-1 min-w-0">
-            <span className="text-zinc-300 font-medium flex items-center gap-1.5 min-w-0 truncate">
-              <Flame className="w-3.5 h-3.5 text-accent-orange shrink-0" />
-              <span className="truncate">{t("ui.badgePosition")}</span>
-            </span>
-            <div className="grid grid-cols-2 gap-1 w-32 max-w-[48%] shrink-0">
-              <button
-                type="button"
-                onClick={() => ed.setRibbonSide("left")}
-                className={`w-full py-1 text-center rounded-lg text-[11px] font-semibold transition-all duration-150 ${
-                  ed.ribbonSide === "left"
-                    ? "bg-white/20 text-white shadow-sm"
-                    : "bg-white/5 text-muted hover:bg-white/10 hover:text-zinc-200"
-                }`}
-              >
-                Nuvio
-              </button>
-              <button
-                type="button"
-                onClick={() => ed.setRibbonSide("right")}
-                className={`w-full py-1 text-center rounded-lg text-[11px] font-semibold transition-all duration-150 ${
-                  ed.ribbonSide === "right"
-                    ? "bg-white/20 text-white shadow-sm"
-                    : "bg-white/5 text-muted hover:bg-white/10 hover:text-zinc-200"
-                }`}
-              >
-                Stremio
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 

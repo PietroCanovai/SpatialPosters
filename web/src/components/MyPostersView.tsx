@@ -1,13 +1,13 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react"
 import { usePSelector } from "@/lib/context"
 import { useT } from "@/lib/contexts/TranslationContext"
 import { toSearchResult } from "@/lib/types"
 import { posterUrl } from "@/lib/utils"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
-import { Search, X, Square, CheckSquare, Trash2, Calendar, ArrowUpAZ, ChevronDown, Clapperboard, Tv, Sparkles, LayoutGrid, ListOrdered } from "lucide-react"
-import { http } from "@/lib/http"
+import { Search, X, Square, CheckSquare, Trash2, Calendar, ArrowUpAZ, ChevronDown, Clapperboard, Tv, Sparkles, LayoutGrid } from "lucide-react"
 import { MoodBoardTile } from "@/components/MoodBoardTile"
 import { PosterLightbox } from "@/components/PosterLightbox"
 import { CollectionBar } from "@/components/CollectionBar"
@@ -17,11 +17,9 @@ import type { Mapping } from "@/lib/types"
 
 export function MyPostersView() {
   const mappings = usePSelector((v) => v.mappings)
-  const goHome = usePSelector((v) => v.goHome)
+  const router = useRouter()
   const navigateToPoster = usePSelector((v) => v.navigateToPoster)
   const removeMapping = usePSelector((v) => v.removeMapping)
-  const loadMappings = usePSelector((v) => v.loadMappings)
-  const tvdbApiKey = usePSelector((v) => v.tvdbApiKey)
   const lang = usePSelector((v) => v.lang)
   const { t } = useT()
   const posterCount = useCountUp(mappings.length)
@@ -39,7 +37,6 @@ export function MyPostersView() {
   const [sortOpen, setSortOpen] = useState(false)
   const [sortClosing, setSortClosing] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [bulkSaving, setBulkSaving] = useState(false)
   const [lightbox, setLightbox] = useState<{ mapping: Mapping; rect: DOMRect } | null>(null)
   const [activeCollection, setActiveCollection] = useState<string | null>(null)
   const {
@@ -112,41 +109,6 @@ export function MyPostersView() {
       }
     } finally {
       setDeleting(false)
-    }
-  }
-
-  const bulkSetOrdering = async (groupId: string | null) => {
-    const toUpdate = mappings.filter((m) => selected.has(`${m.mediaType}:${m.tmdbId}`) && m.mediaType === "tv")
-    if (toUpdate.length === 0) {
-      import("sonner").then(({ toast }) => toast.error(t("ui.bulkNeedTv")))
-      return
-    }
-    if (groupId === "tvdb" && !tvdbApiKey) {
-      import("sonner").then(({ toast }) => toast.error(t("ui.epKeyMissingToast")))
-      return
-    }
-    setBulkSaving(true)
-    try {
-      const results = await Promise.allSettled(
-        toUpdate.map((m) =>
-          http(`/api/mappings/${m.mediaType}:${m.tmdbId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...m, episodeGroupId: groupId }),
-          })
-        )
-      )
-      const failed = results.filter((r) => r.status === "rejected").length
-      if (failed > 0) {
-        import("sonner").then(({ toast }) => toast.error(`Errore su ${failed} poster`))
-      } else {
-        import("sonner").then(({ toast }) => toast.success(`Ordinamento aggiornato per ${toUpdate.length} serie`))
-        setSelected(new Set())
-        setSelectMode(false)
-        await loadMappings()
-      }
-    } finally {
-      setBulkSaving(false)
     }
   }
 
@@ -407,36 +369,6 @@ export function MyPostersView() {
             {t("ui.selectedCount", { count: selected.size })}
           </span>
           <div className="flex flex-wrap items-center gap-2 justify-end">
-            <div className="flex items-center gap-1.5 bg-black/20 rounded-xl p-1 border border-white/5">
-              <span className="text-[11px] text-zinc-400 px-1.5 hidden sm:inline-flex items-center gap-1"><ListOrdered className="w-3 h-3" /> {t("ui.ordering")}</span>
-              <button
-                type="button"
-                disabled={bulkSaving}
-                onClick={() => bulkSetOrdering("standard")}
-                className="text-xs px-2.5 py-1 rounded-lg bg-surface2/60 text-zinc-200 hover:bg-surface2 border border-white/10 disabled:opacity-50"
-                title={t("ui.setStandard")}
-              >
-                Standard
-              </button>
-              <button
-                type="button"
-                disabled={bulkSaving || !tvdbApiKey}
-                onClick={() => bulkSetOrdering("tvdb")}
-                className={`text-xs px-2.5 py-1 rounded-lg border disabled:opacity-50 ${!tvdbApiKey ? "bg-surface2/20 text-zinc-500 border-white/5 cursor-not-allowed" : "bg-surface2/60 text-zinc-200 hover:bg-surface2 border-white/10"}`}
-                title={tvdbApiKey ? t("ui.setTvdb") : t("ui.tvdbKeyNeeded")}
-              >
-                TVDB
-              </button>
-              <button
-                type="button"
-                disabled={bulkSaving}
-                onClick={() => bulkSetOrdering("anizip")}
-                className="text-xs px-2.5 py-1 rounded-lg bg-surface2/60 text-zinc-200 hover:bg-surface2 border border-white/10 disabled:opacity-50"
-                title={t("ui.setAnizip")}
-              >
-                AniZip
-              </button>
-            </div>
             <button
               type="button"
               aria-label={t("ui.cancel")}
@@ -485,7 +417,7 @@ export function MyPostersView() {
               </div>
               <p className="text-zinc-300 text-sm font-medium mb-1.5">{t("ui.emptyPosters")}</p>
               <p className="text-zinc-500 text-xs mb-6 max-w-xs mx-auto leading-relaxed">{t("ui.emptyPostersSub")}</p>
-              <button type="button" onClick={goHome} className="px-6 py-3 btn-primary font-medium press-scale">
+              <button type="button" onClick={() => router.push("/")} className="px-6 py-3 btn-primary font-medium press-scale">
                 {t("ui.searchCta")}
               </button>
             </>
@@ -535,7 +467,7 @@ export function MyPostersView() {
             selectMode={selectMode}
             selected={selected}
             onSelect={() => toggleSelect(`${m.mediaType}:${m.tmdbId}`)}
-            onOpen={() => navigateToPoster(toSearchResult({ id: m.tmdbId, media_type: m.mediaType, title: m.title, name: m.title, poster_path: m.posterPath, release_date: m.releaseDate || undefined, first_air_date: m.firstAirDate || undefined, vote_average: m.voteAverage || undefined }), "myposters")}
+            onOpen={() => navigateToPoster(toSearchResult({ id: m.tmdbId, media_type: m.mediaType, title: m.title, name: m.title, poster_path: m.posterPath, release_date: m.releaseDate || undefined, first_air_date: m.firstAirDate || undefined, vote_average: m.voteAverage || undefined }))}
             onQuickView={(e) => {
               const target = e.currentTarget as HTMLElement
               const tileEl = target.closest(".surface-card") || target.closest(".group") || target
@@ -560,7 +492,7 @@ export function MyPostersView() {
         onOpenEditor={() => {
           if (!lightbox) return
           const m = lightbox.mapping
-          navigateToPoster(toSearchResult({ id: m.tmdbId, media_type: m.mediaType, title: m.title, name: m.title, poster_path: m.posterPath }), "myposters")
+          navigateToPoster(toSearchResult({ id: m.tmdbId, media_type: m.mediaType, title: m.title, name: m.title, poster_path: m.posterPath }))
         }}
       />
       <ConfirmDialog

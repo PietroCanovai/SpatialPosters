@@ -1,6 +1,5 @@
 import sharp from "sharp"
 import { rankPostersByFit } from "@/lib/poster-fit-score"
-import { concurrentMap } from "@/lib/episode-ordering"
 import { envWithFallback } from "@/lib/env-compat"
 import {
   adjustFitResults,
@@ -8,6 +7,21 @@ import {
   type PosterBufferEntry,
   type RankedFitResult,
 } from "@/lib/poster-fit-adjust"
+
+/** map() con al più `limit` promesse in volo, risultati nell'ordine di input. */
+async function concurrentMap<T, R>(items: T[], fn: (item: T, idx: number) => Promise<R>, limit = 5): Promise<R[]> {
+  const results: R[] = new Array(items.length) as R[]
+  let next = 0
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (true) {
+      const i = next++
+      if (i >= items.length) break
+      results[i] = await fn(items[i], i)
+    }
+  })
+  await Promise.all(workers)
+  return results
+}
 
 export interface PosterCandidate {
   readonly file_path: string

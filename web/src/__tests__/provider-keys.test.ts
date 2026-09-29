@@ -4,7 +4,7 @@ import os from "node:os"
 import path from "node:path"
 import { NextRequest } from "next/server"
 
-const ENV = ["SPATIALPOSTERS_TMDB_KEY", "SPATIALPOSTERS_MDBLIST_KEY", "SPATIALPOSTERS_TVDB_API_KEY", "SPATIALPOSTERS_DATA_DIR", "SPATIALPOSTERS_ADMIN_TOKEN"]
+const ENV = ["SPATIALPOSTERS_TMDB_KEY", "SPATIALPOSTERS_MDBLIST_KEY", "SPATIALPOSTERS_DATA_DIR", "SPATIALPOSTERS_ADMIN_TOKEN"]
 let dir: string
 let saved: Record<string, string | undefined>
 
@@ -68,9 +68,9 @@ describe("provider keys", () => {
 
   it("an empty value clears a saved key", async () => {
     const { writeProviderKeys } = await import("@/lib/provider-keys")
-    writeProviderKeys({ tmdb: "t", tvdb: "v" })
+    writeProviderKeys({ tmdb: "t", mdblist: "m" })
     const { PUT } = await import("@/app/api/provider-keys/route")
-    const res = await PUT(put({ tvdb: "" }))
+    const res = await PUT(put({ mdblist: "" }))
     expect(res.status).toBe(200)
     expect((await res.json()).saved).toEqual(["tmdb"])
   })

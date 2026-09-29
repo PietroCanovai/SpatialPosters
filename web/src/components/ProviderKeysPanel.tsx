@@ -5,7 +5,7 @@ import { Check, ExternalLink, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { usePSelector } from "@/lib/context"
 
-type Provider = "tmdb" | "mdblist" | "tvdb"
+type Provider = "tmdb" | "mdblist"
 type Keys = Record<Provider, string>
 
 const PROVIDERS: { id: Provider; name: string; required?: boolean; purpose: string; getKeyUrl: string; getKeyHint: string }[] = [
@@ -24,13 +24,6 @@ const PROVIDERS: { id: Provider; name: string; required?: boolean; purpose: stri
     getKeyUrl: "https://mdblist.com/preferences/",
     getKeyHint: "mdblist.com → Preferences → API key",
   },
-  {
-    id: "tvdb",
-    name: "TVDB",
-    purpose: "Optional. TVDB episode ordering and season types.",
-    getKeyUrl: "https://thetvdb.com/api-information",
-    getKeyHint: "thetvdb.com → API Information → project API key",
-  },
 ]
 
 /**
@@ -40,10 +33,9 @@ const PROVIDERS: { id: Provider; name: string; required?: boolean; purpose: stri
 export function ProviderKeysPanel({ active }: { active: boolean }) {
   const setTmdbKey = usePSelector((v) => v.setTmdbKey)
   const setMdblistApiKey = usePSelector((v) => v.setMdblistApiKey)
-  const setTvdbApiKey = usePSelector((v) => v.setTvdbApiKey)
 
-  const [saved, setSaved] = useState<Keys>({ tmdb: "", mdblist: "", tvdb: "" })
-  const [draft, setDraft] = useState<Keys>({ tmdb: "", mdblist: "", tvdb: "" })
+  const [saved, setSaved] = useState<Keys>({ tmdb: "", mdblist: "" })
+  const [draft, setDraft] = useState<Keys>({ tmdb: "", mdblist: "" })
   const [errors, setErrors] = useState<Partial<Keys>>({})
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -83,7 +75,6 @@ export function ProviderKeysPanel({ active }: { active: boolean }) {
       setErrors(data.errors || {})
       setTmdbKey(data.keys.tmdb)
       setMdblistApiKey(data.keys.mdblist)
-      setTvdbApiKey(data.keys.tvdb)
       if (data.errors && Object.keys(data.errors).length) toast.error("Some keys were rejected")
       else toast.success("API keys saved")
     } catch (e) {

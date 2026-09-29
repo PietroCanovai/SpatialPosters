@@ -1,7 +1,7 @@
 import { getDomain } from "./utils"
 import { resolveLabel, isRankKey, t as tFn } from "./i18n"
 import { getPosterPublicBaseUrl } from "./poster-public-url"
-import { buildStremioPosterSearchParams } from "./stremio-poster-params"
+import { buildPosterRenderSearchParams } from "./poster-render-params"
 import { RENDER_VERSION } from "./render-version"
 import { TOP_LIGHT_LUMINANCE } from "./constants"
 import type { SearchResult, TMDBImage } from "./types"
@@ -38,6 +38,16 @@ interface PosterState {
   logoScale: number
   logoOffsetX: number
   logoOffsetY: number
+  /** Zoom (%) e pan del poster sotto il logo; assenti = nessuna trasformazione. */
+  posterScale?: number
+  posterOffsetX?: number
+  posterOffsetY?: number
+  /**
+   * Preview dell'editor: il logo viene disegnato lato client (trascinamento
+   * senza render). Il server riceve il logo solo per i colori badge (nologo=1)
+   * e scala/offset non entrano nella URL.
+   */
+  liveLogo?: boolean
   backdropScale: number
   backdropOffsetX: number
   backdropOffsetY: number
@@ -67,7 +77,7 @@ interface PosterState {
 
 export function buildUrlPattern(bp: BadgeParams & { tmdbKey: string; lang: string; mdblistApiKey?: string }): string {
   let url = `${getPosterPublicBaseUrl()}/api/poster/{type}/{imdb_id}`
-  const params = buildStremioPosterSearchParams({
+  const params = buildPosterRenderSearchParams({
     apiKey: bp.tmdbKey,
     mdblistKey: bp.mdblistApiKey,
     lang: bp.lang,
@@ -121,9 +131,18 @@ export function buildPreviewUrl(ps: PosterState, bp: BadgeParams): string {
   }
   if (ps.selectedLogo && ps.previewPoster?.iso_639_1 === null) {
     params.push(`logo=${encodeURIComponent(ps.selectedLogo.file_path)}`)
-    params.push(`scale=${ps.logoScale}`)
-    params.push(`ox=${ps.logoOffsetX}`)
-    params.push(`oy=${ps.logoOffsetY}`)
+    if (ps.liveLogo) {
+      params.push("nologo=1")
+    } else {
+      params.push(`scale=${ps.logoScale}`)
+      params.push(`ox=${ps.logoOffsetX}`)
+      params.push(`oy=${ps.logoOffsetY}`)
+    }
+  }
+  if (ps.posterScale && ps.posterScale !== 100) {
+    params.push(`pscale=${Math.round(ps.posterScale)}`)
+    params.push(`pox=${Math.round(ps.posterOffsetX ?? 0)}`)
+    params.push(`poy=${Math.round(ps.posterOffsetY ?? 0)}`)
   }
   if (ps.selectedBackdrop) {
     params.push(`backdrop=${encodeURIComponent(ps.selectedBackdrop.file_path)}`)

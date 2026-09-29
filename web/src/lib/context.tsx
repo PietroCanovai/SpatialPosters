@@ -1,7 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo, useSyncExternalStore } from "react"
-import type { SearchResult, TMDBImage, Mapping, CustomCatalogConfig } from "./types"
+import type { SearchResult, TMDBImage, Mapping } from "./types"
 import { posterUrl, titleOf, yearOf, STREAMING_PLATFORMS } from "./utils"
 import { matchTMDBStudios } from "./awards"
 import { setLang as setI18nLang, createT } from "./i18n"
@@ -13,7 +13,8 @@ import { buildUrlPattern, buildPreviewUrl } from "./poster-url"
 import { selectBestLogo, autoLogoSelection, logoDefaultScale } from "./logo-selection"
 import { useTrending } from "./useTrending"
 import { useSearch } from "./useSearch"
-import { useNavigation } from "./useNavigation"
+import { useNavigation, rememberItemSummary, editorHref } from "./useNavigation"
+import { useRouter } from "next/navigation"
 import { useMappingsStore } from "./useMappingsStore"
 import { usePosterEditor, PosterEditorProvider } from "./contexts/PosterEditorContext"
 import { usePosterSave } from "./usePosterSave"
@@ -26,10 +27,7 @@ import { SettingsProvider } from "./contexts/SettingsContext"
 import { TranslationProvider } from "./contexts/TranslationContext"
 import { MetaInfoProvider } from "./contexts/MetaInfoContext"
 import { MappingsProvider } from "./contexts/MappingsContext"
-import { useCustomCatalogs } from "./useCustomCatalogs"
-import { migrateLegacyStorage } from "./storage-migration"
 
-export type ViewType = "search" | "myposters" | "edit" | "cataloghi"
 
 export interface MetaInfo {
   genres: { id: number; name: string }[]
@@ -57,10 +55,6 @@ export interface MetaInfo {
 export interface SpatialCtx {
   selected: SearchResult | null
   setSelected: React.Dispatch<React.SetStateAction<SearchResult | null>>
-  view: ViewType
-  setView: React.Dispatch<React.SetStateAction<ViewType>>
-  /** Navigazione centralizzata (push/replace/back). */
-  router: { push: (v: ViewType) => void; replace: (v: ViewType) => void; back: () => void }
   posters: TMDBImage[]
   loadingImages: boolean
   previewPoster: TMDBImage | null
@@ -90,12 +84,14 @@ export interface SpatialCtx {
   metaInfo: MetaInfo
   previewId: string | null
   setPreviewId: React.Dispatch<React.SetStateAction<string | null>>
-  saveConfig: () => Promise<void>
+  /** silent: niente toast e rilancia l'errore (usato da "Send to Jellyfin"). */
+  saveConfig: (opts?: { silent?: boolean }) => Promise<void>
   removeMapping: (m: Mapping) => Promise<void>
   mappingsMap: Map<string, Mapping>
-  goHome: () => void
-  sourceView: "edit" | "search" | "myposters" | "cataloghi" | null
-  navigateToPoster: (item: SearchResult, source?: string) => void
+  /** Apre l'editor del titolo con una navigazione vera (/movie/[id] o /tv/[id]). */
+  navigateToPoster: (item: SearchResult) => void
+  /** Carica il titolo nell'editor della pagina corrente (usato da /movie/[id] e /tv/[id]). */
+  openPoster: (item: SearchResult) => void
   refreshLists: () => Promise<void>
   tmdbKey: string
   setQuery: React.Dispatch<React.SetStateAction<string>>
@@ -139,8 +135,6 @@ export interface SpatialCtx {
   setTmdbKey: (v: string) => void
   mdblistApiKey: string
   setMdblistApiKey: (v: string) => void
-  tvdbApiKey: string
-  setTvdbApiKey: (v: string) => void
   exportData: () => Promise<void>
   importData: () => void
   copyUrl: () => Promise<void>
@@ -157,25 +151,6 @@ export interface SpatialCtx {
   serviceErrors: Record<string, boolean>
   setServiceErrors: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
   hasNetflixRank: boolean
-  customCatalogs: CustomCatalogConfig[]
-  setCustomCatalogs: (catalogs: CustomCatalogConfig[]) => void
-  addCustomCatalog: (catalog: Omit<CustomCatalogConfig, "id">) => void
-  removeCustomCatalog: (id: string) => void
-  toggleCustomCatalog: (id: string) => void
-  disabledCatalogIds: string[]
-  setDisabledCatalogIds: (ids: string[]) => void
-  toggleBuiltinCatalog: (id: string) => void
-  homeDisabledCatalogIds: string[]
-  setHomeDisabledCatalogIds: (ids: string[]) => void
-  toggleCatalogHome: (id: string) => void
-  catalogOrder: string[]
-  setCatalogOrder: (order: string[]) => void
-  moveCatalog: (id: string, direction: "up" | "down") => void
-  catalogRenames: Record<string, string>
-  setCatalogRenames: (renames: Record<string, string>) => void
-  renameCatalog: (id: string, newName: string) => void
-  resetCatalogNames: () => void
-  resetCatalogOrder: () => void
   refreshPosters: () => Promise<void>
 }
 
@@ -254,13 +229,6 @@ export const PictoriumProvider = SpatialProvider
  * per backward compat via useP()).
  */
 export function PictoriumRoot({ children }: { children: React.ReactNode }) {
-  // Migrazione one-time localStorage posterium_* → pictorium_*: l'initializer
-  // di useState gira nel render del parent, quindi PRIMA degli useEffect dei
-  // figli che leggono lo storage (hydration da useCustomCatalogs, tema, ...).
-  useState(() => {
-    migrateLegacyStorage()
-    return null
-  })
   return (
     <PosterEditorProvider>
       <PictoriumRootInner>{children}</PictoriumRootInner>
@@ -286,7 +254,6 @@ export function usePictorium(): PictoriumCtx {
   const t = useMemo(() => createT(lang), [lang])
   const [tmdbKey, setTmdbKeyState] = useState("")
   const [mdblistApiKey, setMdblistApiKey] = useState("")
-  const [tvdbApiKey, setTvdbApiKey] = useState("")
   const [tmdbKeyInput, setTmdbKeyInput] = useState("")
   const [showKey, setShowKey] = useState(false)
   const [theme, setTheme] = useState<"dark" | "light">("dark")
@@ -309,6 +276,7 @@ export function usePictorium(): PictoriumCtx {
   const langInit = useRef(false)
 
   const navigation = useNavigation()
+  const nextRouter = useRouter()
   const editorCtx = usePosterEditor()
   const trending = useTrending(tmdbKey, mdblistApiKey, editorCtx.defaultRegion)
   const tmdbLang = getRegionDef(editorCtx.defaultRegion).lang
@@ -361,6 +329,10 @@ export function usePictorium(): PictoriumCtx {
     logoOffsetX, setLogoOffsetX,
     logoOffsetY, setLogoOffsetY,
     logoDisabled, setLogoDisabled,
+    // Poster transform
+    posterScale, setPosterScale,
+    posterOffsetX, setPosterOffsetX,
+    posterOffsetY, setPosterOffsetY,
     // Backdrop
     setBackdrops,
     selectedBackdrop, setSelectedBackdrop,
@@ -462,29 +434,6 @@ export function usePictorium(): PictoriumCtx {
     })
   }, [navigation.previewPoster, navigation.selectedLogo, logoScale, hasBadges])
 
-  // --- Custom Catalogs & Profile Auth Hooks ---
-  const {
-    customCatalogs,
-    setCustomCatalogs,
-    addCustomCatalog,
-    removeCustomCatalog,
-    toggleCustomCatalog,
-    disabledCatalogIds,
-    setDisabledCatalogIds,
-    toggleBuiltinCatalog,
-    homeDisabledCatalogIds,
-    setHomeDisabledCatalogIds,
-    toggleCatalogHome,
-    catalogOrder,
-    setCatalogOrder,
-    moveCatalog,
-    catalogRenames,
-    setCatalogRenames,
-    renameCatalog,
-    resetCatalogNames,
-    resetCatalogOrder,
-  } = useCustomCatalogs(safeGetItem, safeSetItem)
-
   const setTmdbKey = useCallback((val: string) => {
     setTmdbKeyState(val)
     setTmdbKeyInput(val)
@@ -496,11 +445,6 @@ export function usePictorium(): PictoriumCtx {
     safeSetItem("mdblist_key", val)
   }, [safeSetItem])
 
-  const setTvdbApiKeyFn = useCallback((val: string) => {
-    setTvdbApiKey(val)
-    safeSetItem("tvdb_key", val)
-  }, [safeSetItem])
-
   useEffect(() => {
     if (keyInit.current) return
     keyInit.current = true
@@ -509,8 +453,6 @@ export function usePictorium(): PictoriumCtx {
     setTmdbKeyInput(savedTmdb)
     const savedMdblist = safeGetItem("mdblist_key") || ""
     setMdblistApiKey(savedMdblist)
-    const savedTvdb = safeGetItem("tvdb_key") || ""
-    setTvdbApiKey(savedTvdb)
     const savedTheme = safeGetItem("pictorium_theme")
     if (savedTheme === "light" || savedTheme === "dark") setTheme(savedTheme)
 
@@ -520,7 +462,7 @@ export function usePictorium(): PictoriumCtx {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!data?.serverKeys) return
-        const { tmdbKey, mdblistApiKey: mdblistKey, tvdbApiKey: tvdbKey } = data.serverKeys
+        const { tmdbKey, mdblistApiKey: mdblistKey } = data.serverKeys
         // Le chiavi salvate sul server (Impostazioni → API keys) sono la fonte
         // di verità: vincono su quelle rimaste nel localStorage.
         if (tmdbKey && tmdbKey !== savedTmdb) {
@@ -531,10 +473,6 @@ export function usePictorium(): PictoriumCtx {
         if (mdblistKey && mdblistKey !== savedMdblist) {
           setMdblistApiKey(mdblistKey)
           safeSetItem("mdblist_key", mdblistKey)
-        }
-        if (tvdbKey && tvdbKey !== savedTvdb) {
-          setTvdbApiKey(tvdbKey)
-          safeSetItem("tvdb_key", tvdbKey)
         }
       })
       .catch(() => {
@@ -603,6 +541,15 @@ export function usePictorium(): PictoriumCtx {
     }))
   }, [globalBadges, rankingBadges, badgeGenre, badgeYear, badgeRating, manualQuality, badgeFormat, ratingSources, networkLogo, ribbonSide, gradientHeight, blurIntensity, blurFade, blurDarkness, blurEnabled, badgeStyle, rankingBadgeStyle, tmdbKey, lang, mdblistApiKey]) // eslint-disable-line react-hooks/exhaustive-deps -- customBadge intentionally excluded to avoid loop
 
+  // --- Poster transform "committed" (debounced) ---
+  // Mentre si trascina, la preview mostra il poster spostato via CSS (PosterPreview);
+  // il render server parte solo quando i valori smettono di cambiare.
+  const [committedPosterTransform, setCommittedPosterTransform] = useState({ posterScale: 100, posterOffsetX: 0, posterOffsetY: 0 })
+  useEffect(() => {
+    const timer = setTimeout(() => setCommittedPosterTransform({ posterScale, posterOffsetX, posterOffsetY }), 250)
+    return () => clearTimeout(timer)
+  }, [posterScale, posterOffsetX, posterOffsetY])
+
   // --- Preview URL ---
   const buildPreviewUrlCb = useCallback(() => {
     const url = buildPreviewUrl(
@@ -612,6 +559,10 @@ export function usePictorium(): PictoriumCtx {
         selectedLogo: navigation.selectedLogo,
         selectedBackdrop,
         logoScale, logoOffsetX, logoOffsetY,
+        ...committedPosterTransform,
+        // Il logo è disegnato lato client sopra il render: trascinarlo non
+        // richiede un nuovo render server.
+        liveLogo: true,
         backdropScale, backdropOffsetX, backdropOffsetY,
         metaInfo, trendRank, mdblistAnimeList: trending.mdblistAnimeList,
         topEdgeColor, accentColor, lang, tmdbKey,
@@ -620,8 +571,11 @@ export function usePictorium(): PictoriumCtx {
       { globalBadges, rankingBadges, badgeStyle, rankingBadgeStyle, badgeGenre, badgeYear, badgeRating, manualQuality, badgeFormat, ratingSources, customBadge, gradientHeight, blurIntensity, blurFade, blurDarkness, blurEnabled, networkLogo, ribbonSide }
     )
     setPreviewUrl(url)
+  // logoScale/offset non sono in dipendenza: con liveLogo non entrano nella URL
+  // (il logo è disegnato lato client), quindi trascinarlo non rifà il render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation.selected, navigation.previewPoster, navigation.selectedLogo, selectedBackdrop,
-    logoScale, logoOffsetX, logoOffsetY, backdropScale, backdropOffsetX, backdropOffsetY,
+    committedPosterTransform, backdropScale, backdropOffsetX, backdropOffsetY,
     metaInfo, trendRank, trending.mdblistAnimeList, topEdgeColor, accentColor, lang, tmdbKey,
     editorCtx.defaultRegion,
     globalBadges, rankingBadges, badgeStyle, rankingBadgeStyle, badgeGenre, badgeYear, badgeRating, manualQuality, badgeFormat, ratingSources, customBadge, gradientHeight, blurIntensity, blurFade, blurDarkness, blurEnabled, networkLogo, ribbonSide])
@@ -772,7 +726,6 @@ export function usePictorium(): PictoriumCtx {
     setLoadingImages(true)
     setOpenSections({})
     navigation.setPreviewId(`${itemType}:${itemId}`)
-    navigation.setView("edit")
 
     // Imposta stili subito (sync) prima delle chiamate async
     // per evitare race condition: se l'utente cambia opzioni mentre
@@ -802,6 +755,9 @@ export function usePictorium(): PictoriumCtx {
       setLogoDisabled(existing.logoDisabled ?? false)
       setLogoOffsetX(existing.logoOffsetX ?? 0)
       setLogoOffsetY(existing.logoOffsetY ?? 0)
+      setPosterScale(existing.posterScale ?? 100)
+      setPosterOffsetX(existing.posterOffsetX ?? 0)
+      setPosterOffsetY(existing.posterOffsetY ?? 0)
       setBackdropScale(existing.backdropScale ?? 100)
       setBackdropOffsetX(existing.backdropOffsetX ?? 0)
       setBackdropOffsetY(existing.backdropOffsetY ?? 0)
@@ -829,6 +785,9 @@ export function usePictorium(): PictoriumCtx {
       setLogoDisabled(false)
       setLogoOffsetX(0)
       setLogoOffsetY(0)
+      setPosterScale(100)
+      setPosterOffsetX(0)
+      setPosterOffsetY(0)
       setSelectedBackdrop(null)
       setBackdropScale(100)
       setBackdropOffsetX(0)
@@ -922,6 +881,7 @@ export function usePictorium(): PictoriumCtx {
     setSelectedLogo: navigation.setSelectedLogo, setPreviewPoster: navigation.setPreviewPoster, setPreviewId: navigation.setPreviewId,
     posters: navigation.posters, metaInfo, trendRank, mdblistAnimeList: trending.mdblistAnimeList,
     mappingsMap, loadMappings, logoScale, logoOffsetX, logoOffsetY,
+    posterScale, posterOffsetX, posterOffsetY,
     selectedBackdrop, setSelectedBackdrop: setSelectedBackdrop, backdropScale, backdropOffsetX, backdropOffsetY,
     setBackdropScale, setBackdropOffsetX, setBackdropOffsetY,
     globalBadges, rankingBadges, customBadge, badgeStyle, rankingBadgeStyle,
@@ -932,8 +892,8 @@ export function usePictorium(): PictoriumCtx {
     setLogoScale, setLogoOffsetX, setLogoOffsetY, networkLogo, ribbonSide, lang, episodeGroupId,
   })
 
-  const saveConfig = useCallback(async () => {
-    await savePosterConfig()
+  const saveConfig = useCallback(async (opts: { silent?: boolean } = {}) => {
+    await savePosterConfig({ silent: opts.silent })
   }, [savePosterConfig])
 
   const autoSaveExcludedPosters = useCallback(async (nextExcluded: string[], nextRotationPosters?: string[], nextPreviewPoster?: TMDBImage) => {
@@ -965,8 +925,6 @@ export function usePictorium(): PictoriumCtx {
 
   return useMemo(() => ({
     selected: navigation.selected, setSelected: navigation.setSelected,
-    view: navigation.view, setView: navigation.setView as React.Dispatch<React.SetStateAction<ViewType>>,
-    router: navigation.router,
     posters: navigation.posters, loadingImages,
     previewPoster: navigation.previewPoster, setPreviewPoster: navigation.setPreviewPoster,
     selectedLogo: navigation.selectedLogo, setSelectedLogo: navigation.setSelectedLogo,
@@ -984,7 +942,8 @@ export function usePictorium(): PictoriumCtx {
     metaInfo,
     previewId: navigation.previewId, setPreviewId: navigation.setPreviewId,
     saveConfig, removeMapping, mappingsMap,
-    goHome: navigation.goHome, sourceView: navigation.sourceView, navigateToPoster: (item: SearchResult, source?: string) => { navigation.navigateToPoster(item, source); openPosterBrowserRef.current(item) },
+    navigateToPoster: (item: SearchResult) => { rememberItemSummary(item); nextRouter.push(editorHref(item)) },
+    openPoster: (item: SearchResult) => { openPosterBrowserRef.current(item) },
     refreshLists: trending.refreshLists,
     refreshPosters,
     tmdbKey, setQuery: search.setQuery, doSearch: search.doSearch, loadMore: search.loadMore,
@@ -1000,7 +959,6 @@ export function usePictorium(): PictoriumCtx {
     tmdbKeyInput, setTmdbKeyInput,
     showKey, setShowKey, setTmdbKey,
     mdblistApiKey, setMdblistApiKey: setMdblistApiKeyFn,
-    tvdbApiKey, setTvdbApiKey: setTvdbApiKeyFn,
     exportData, importData, removeRecentSearch: search.removeRecentSearch, clearRecentSearches: search.clearRecentSearches,
     copyUrl, copied,
     accentColor, autoAccentColor, setAccentColor,
@@ -1010,15 +968,10 @@ export function usePictorium(): PictoriumCtx {
     uiAccent, setUiAccent,
     serviceErrors, setServiceErrors,
     hasNetflixRank,
-    customCatalogs, setCustomCatalogs, addCustomCatalog, removeCustomCatalog, toggleCustomCatalog,
-    disabledCatalogIds, setDisabledCatalogIds, toggleBuiltinCatalog,
-    homeDisabledCatalogIds, setHomeDisabledCatalogIds, toggleCatalogHome,
-    catalogOrder, setCatalogOrder, moveCatalog,
-    catalogRenames, setCatalogRenames, renameCatalog, resetCatalogNames, resetCatalogOrder,
     t,
   // eslint-disable-next-line react-hooks/exhaustive-deps -- context value deps intentionally stable to prevent re-render cascades
   }), [
-    navigation.selected, navigation.view, navigation.posters, loadingImages, navigation.previewPoster, navigation.selectedLogo,
+    navigation.selected, navigation.posters, loadingImages, navigation.previewPoster, navigation.selectedLogo,
     navigation.logos, posterActivePath, previewUrl, urlPattern, lang,
     openSections, posterScrollInfo, logoBounds,
     trendRank, mdblistMatch, imdbTop250, metaInfo, navigation.previewId,
@@ -1026,13 +979,12 @@ export function usePictorium(): PictoriumCtx {
     mappingsMap, tmdbKey, search.query, search.results, search.searching, search.totalResults, search.totalPages, search.searchPage, search.recentSearches, search.clearRecentSearches,
     mappings,
     langOpen, settingsOpen, showLangPicker,
-    tmdbKeyInput, showKey, copied, mdblistApiKey, tvdbApiKey,
+    tmdbKeyInput, showKey, copied, mdblistApiKey,
     accentColor, autoAccentColor, setAccentColor,
     topEdgeColor, autoSaveExcludedPosters,
     trending.trending, trending.trendingError, trending.streamingCharts, trending.mdblistAnimeList,
     trending.refreshLists,
     refreshPosters,
     theme, uiAccent, serviceErrors, hasNetflixRank,
-    customCatalogs, disabledCatalogIds, homeDisabledCatalogIds, catalogOrder, catalogRenames,
   ])
 }

@@ -30,7 +30,6 @@ import {
   Trash2,
   Sparkles,
   Tv,
-  Flame,
   ChevronDown,
   Sliders,
   Database,
@@ -506,42 +505,6 @@ export function SettingsPanel({ setSettingsOpen, exportData, importData, mobile,
             />
           </div>
 
-          <div className="flex items-center justify-between gap-3 pt-1">
-            <span className="text-zinc-300 font-medium flex items-center gap-1.5 shrink-0">
-              <Layers className="w-3.5 h-3.5 text-accent-orange" />
-              {t("ui.badgePosition")}
-            </span>
-            <div className="flex gap-1 flex-1 max-w-[160px]">
-              <button
-                type="button"
-                onClick={() => {
-                  ed.setDefaultRibbonSide("left")
-                  ed.setRibbonSide("left")
-                }}
-                className={`flex-1 py-1 rounded-lg text-[11px] font-semibold transition-all duration-150 cursor-pointer ${
-                  ed.defaultRibbonSide === "left"
-                    ? "bg-white/20 text-white shadow-sm"
-                    : "bg-white/5 text-muted hover:bg-white/10 hover:text-zinc-200"
-                }`}
-              >
-                Nuvio
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  ed.setDefaultRibbonSide("right")
-                  ed.setRibbonSide("right")
-                }}
-                className={`flex-1 py-1 rounded-lg text-[11px] font-semibold transition-all duration-150 cursor-pointer ${
-                  ed.defaultRibbonSide === "right"
-                    ? "bg-white/20 text-white shadow-sm"
-                    : "bg-white/5 text-muted hover:bg-white/10 hover:text-zinc-200"
-                }`}
-              >
-                Stremio
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -735,48 +698,6 @@ export function SettingsPanel({ setSettingsOpen, exportData, importData, mobile,
         <p className="text-[10px] text-muted leading-tight">{t("ui.regionHint")}</p>
       </div>
 
-      {/* Fonte Metadati Serie & Episodi */}
-      <div className="bg-surface/50 border border-surface2/60 rounded-xl p-3.5 space-y-2.5 shadow-sm">
-        <span className="font-semibold text-zinc-200 flex items-center gap-1.5">
-          <Tv className="w-3.5 h-3.5 text-sky-400" />
-          {t("ui.episodeMetadataSource")}
-        </span>
-        <div className="flex items-center justify-between gap-2 pt-0.5">
-          <span className="text-zinc-300 font-medium">{t("ui.episodeMetadataSource")}</span>
-          <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={() => {
-                ed.setDefaultEpisodeMetadataSource("tmdb")
-                ed.setEpisodeMetadataSource("tmdb")
-              }}
-              className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all duration-150 cursor-pointer ${
-                ed.episodeMetadataSource === "tmdb"
-                  ? "bg-white/20 text-white shadow-sm"
-                  : "bg-white/5 text-muted hover:bg-white/10 hover:text-zinc-200"
-              }`}
-            >
-              TMDB
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                ed.setDefaultEpisodeMetadataSource("tvdb")
-                ed.setEpisodeMetadataSource("tvdb")
-              }}
-              className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all duration-150 cursor-pointer ${
-                ed.episodeMetadataSource === "tvdb"
-                  ? "bg-white/20 text-white shadow-sm"
-                  : "bg-white/5 text-muted hover:bg-white/10 hover:text-zinc-200"
-              }`}
-            >
-              TVDB
-            </button>
-          </div>
-        </div>
-        <p className="text-[10px] text-muted leading-tight">{t("ui.episodeMetadataSourceHint")}</p>
-      </div>
-
       {/* Automazioni & Aspetto */}
       <div className="bg-surface/50 border border-surface2/60 rounded-xl p-3.5 space-y-2.5 shadow-sm">
         <span className="font-semibold text-zinc-200 flex items-center gap-1.5">
@@ -876,23 +797,7 @@ export function SettingsPanel({ setSettingsOpen, exportData, importData, mobile,
               : "1-Click"}
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                toast.info(t("ui.warmupStarted"))
-                await http<{ ok: boolean }>("/api/warmup", { method: "POST", retries: 0 })
-                toast.success(t("ui.warmupDone"))
-              } catch {
-                toast.error(t("ui.warmupError"))
-              }
-            }}
-            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-medium bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 active:scale-[0.98] transition-all border border-amber-500/20 cursor-pointer"
-          >
-            <Flame className="w-3.5 h-3.5" />
-            Warmup
-          </button>
+        <div className="grid grid-cols-1 gap-2 pt-1">
           <button
             type="button"
             onClick={clearCache}

@@ -5,7 +5,6 @@ import { __clearTMDBCache } from "@/lib/tmdb"
 import { __clearFlixpatrolCache } from "@/lib/flixpatrol"
 import { __resetTMDBSessionCache } from "@/lib/tmdb-session-cache"
 import { clearRegionStatsCache } from "@/lib/image-utils"
-import { clearTvdbCache } from "@/lib/tvdb"
 import { __resetNetworkLogoCache } from "@/lib/network-svgs"
 import { checkAdminToken, isSameOrigin, adminAuthResponse, originMismatchResponse } from "@/lib/auth"
 import { rateLimit, rateLimitKey, rateLimitResponse } from "@/lib/rate-limit"
@@ -26,7 +25,6 @@ export async function POST(req: Request) {
   __clearFlixpatrolCache()
   __resetTMDBSessionCache()
   clearRegionStatsCache()
-  clearTvdbCache()
   __resetNetworkLogoCache()
   return Response.json({ ok: true, message: "Cache svuotata" })
 }

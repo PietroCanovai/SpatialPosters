@@ -36,7 +36,14 @@ export const PosterBtn = React.memo(function PosterBtn({ img, active, onSelect, 
           </>
         )}
         {!active && <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-white/5 transition-opacity duration-300" />}
-        
+
+        {/* Risoluzione dell'originale TMDB (i poster da URL custom/Reddit non hanno dimensioni reali) */}
+        {img.width > 0 && img.height > 0 && !/^https?:\/\//.test(img.file_path) && (
+          <span className={`absolute left-1 ${active ? "bottom-5" : "bottom-1"} z-10 text-[9px] font-mono font-semibold tabular-nums px-1 py-px rounded bg-black/70 text-zinc-100 backdrop-blur-sm`}>
+            {img.width}×{img.height}
+          </span>
+        )}
+
         {/* Reddit Meta Data Overlay */}
         {(img as any)._redditAuthor && (
           <div className="absolute bottom-1 left-1 right-1 flex flex-col gap-0.5 opacity-90 transition-opacity">

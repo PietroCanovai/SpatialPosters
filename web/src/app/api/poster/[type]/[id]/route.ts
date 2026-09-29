@@ -18,7 +18,7 @@ import { fetchAggregatedRating, calculateAverageRating } from "@/lib/ratings"
 import { isImdbTop250 } from "@/lib/imdb-top250"
 import { getEffectiveRotationState, tryRotatePoster } from "@/lib/poster-rotation"
 import { getTMDBSessionCache, setTMDBSessionCache } from "@/lib/tmdb-session-cache"
-import { mappingVersionParam } from "@/lib/stremio-poster-url"
+import { mappingVersionParam } from "@/lib/poster-render-url"
 import { RENDER_VERSION } from "@/lib/render-version"
 import { envWithFallback } from "@/lib/env-compat"
 import {
@@ -33,7 +33,6 @@ import {
   posterNotModifiedHeaders,
   posterResponse,
   readCachedPoster,
-  readCachedPosterAsync,
   readPosterError,
   recordZombieRenderStart,
   schedulePosterRefresh,
@@ -58,9 +57,8 @@ import { generatePosterBuffer, type GenerationInput } from "@/lib/poster-service
 import { computeTopBadge } from "@/lib/poster-badge"
 
 import { resolveImdbToTmdb } from "@/lib/imdb-resolver"
-import { decodeConfig } from "@/lib/config-token"
 import { createLogger } from "@/lib/logger"
-import { resolvePosterRenderConfig } from "@/lib/poster-config"
+import { resolvePosterRenderConfig, resolvePosterTransform, posterCropWindow } from "@/lib/poster-config"
 import { selectBestLogo, logoBestLogoFallbackReason } from "@/lib/logo-selection"
 
 
@@ -126,10 +124,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
   const { type, id } = await params
   const mediaType = (["series", "tv", "show", "tvshow"].includes(type?.toLowerCase() || "")) ? "tv" : "movie"
 
-  // Decode optional stateless config token (stile AIOMetadata / RPDB)
-  const configToken = req.nextUrl.searchParams.get("config") || req.nextUrl.searchParams.get("c")
-  const configOverride = configToken ? decodeConfig(configToken) : null
-
   let tmdbId = Number(id)
   if (isNaN(tmdbId) || tmdbId <= 0) {
     if (typeof id === "string" && id.startsWith("tt")) {
@@ -146,10 +140,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
   let mapping = await getById(mediaType, tmdbId)
   const sd = getServerDefaults()
   const qRegion = parseRegion(req.nextUrl.searchParams.get("region") ?? req.nextUrl.searchParams.get("country"))
-  const configRegion = parseRegion(configOverride?.region)
   const langParam = req.nextUrl.searchParams.get("lang") || mapping?.language
   const langRegion = langParam ? (parseRegion(langParam) ?? defaultRegionForLang(langParam)) : null
-  const posterRegion = getRegionDef(qRegion ?? configRegion ?? langRegion ?? normalizeRegion(sd.region))
+  const posterRegion = getRegionDef(qRegion ?? langRegion ?? normalizeRegion(sd.region))
 
   // Auto-rotate clean poster
   const rotationState = getEffectiveRotationState(mapping)
@@ -166,8 +159,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
   // 2. Cache key
   const sdHash = hashKey(JSON.stringify(sd))
   const cacheParams = normalizePosterCacheParams(req.nextUrl.searchParams)
-  cacheParams.delete("config")
-  cacheParams.delete("c")
   cacheParams.delete("u")
   cacheParams.delete("user")
   // api_key non influisce sul rendering: rimuoverla evita frammentazione della
@@ -177,11 +168,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
   const cachedRank = mapping?.trendRank ?? null
   const rotateKey = isRotating ? `:ci${mapping?.cleanPosterIndex ?? "x"}` : ""
   const mapVersion = mapping?.updatedAt ? `:mu${mapping.updatedAt}` : ""
-  const configHash = configOverride ? hashKey(JSON.stringify(configOverride)) : ""
   const outputFormat = resolveImageFormat(req.headers.get("accept"), req.nextUrl.searchParams.get("fmt") || req.nextUrl.searchParams.get("format"))
   const formatKey = outputFormat !== "jpeg" ? `:fmt${outputFormat}` : ""
-  const cacheKey = `poster:v${RENDER_VERSION}:${mediaType}:${tmdbId}:reg${posterRegion.code}:r${cachedRank ?? "x"}:sd${sdHash}:${cacheParams.toString()}${rotateKey}${mapVersion}${configHash ? `:cfg${configHash}` : ""}${formatKey}`
-  const etagBase = hashKey(`v${RENDER_VERSION}:${mediaType}:${tmdbId}:reg${posterRegion.code}:r${cachedRank ?? "x"}:sd${sdHash}:${cacheParams.toString()}${configHash ? `:${configHash}` : ""}:${outputFormat}`)
+  const cacheKey = `poster:v${RENDER_VERSION}:${mediaType}:${tmdbId}:reg${posterRegion.code}:r${cachedRank ?? "x"}:sd${sdHash}:${cacheParams.toString()}${rotateKey}${mapVersion}${formatKey}`
+  const etagBase = hashKey(`v${RENDER_VERSION}:${mediaType}:${tmdbId}:reg${posterRegion.code}:r${cachedRank ?? "x"}:sd${sdHash}:${cacheParams.toString()}:${outputFormat}`)
   const currentMappingVersion = mappingVersionParam(mapping)
   const immutablePoster = isImmutablePosterRequest(req.nextUrl.searchParams, {
     hasMapping: !!mapping,
@@ -195,13 +185,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
   // stantii per un giorno intero. Il flag non cambia per tutta la richiesta.
   const dynamicPoster = !mapping
 
-  // 3. Cache check (L1 Memory + L2 ImgBB Storage + L3 R2 Storage)
-  const cachedPoster = await readCachedPosterAsync(cacheKey, outputFormat)
-  if (cachedPoster.imgbbUrl && !isPreview && req.nextUrl.searchParams.get("redirect") !== "0") {
-    log.debug("Poster cache hit: 307 Redirect to ImgBB", { mediaType, tmdbId, imgbbUrl: cachedPoster.imgbbUrl, ms: Date.now() - startTime })
-    recordPosterRequest(true, outputFormat)
-    return Response.redirect(cachedPoster.imgbbUrl, 307)
-  }
+  // 3. Cache check (memoria)
+  const cachedPoster = readCachedPoster(cacheKey)
   if (cachedPoster.payload) {
     recordPosterRequest(true, outputFormat)
     if (!isPreview && req.headers.get("If-None-Match") === cachedPoster.payload.etag) {
@@ -344,7 +329,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
   const qRsrc = req.nextUrl.searchParams.get("rsrc")
   const reqRatingSources = qRsrc !== null
     ? qRsrc.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
-    : (configOverride?.ratingSources ?? undefined)
+    : undefined
   const t = createT(req.nextUrl.searchParams.get("lang") || mapping?.language || "it")
 
   if (queryPoster) {
@@ -493,11 +478,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
         }
         const qLogoFit = req.nextUrl.searchParams.get("logoFit")
         // Override globale dell'istanza (PICTORIUM_BEST_FIT_ENABLED): vince su
-        // query, config token e server defaults. Utile su Vercel/HF dove il
-        // toggle client o i defaults salvati non sempre arrivano al server.
+        // query e server defaults.
         const logoFitEnabled = BEST_FIT_GLOBAL === "off" ? false
           : BEST_FIT_GLOBAL === "on" ? true
-          : qLogoFit !== null ? qLogoFit !== "0" : (configOverride !== null ? (configOverride.logoFitEnabled ?? sd.defaultLogoFitEnabled === true) : sd.defaultLogoFitEnabled === true)
+          : qLogoFit !== null ? qLogoFit !== "0" : sd.defaultLogoFitEnabled === true
         if (logoPath && logoFitEnabled) {
           try {
             const fitStart = Date.now()
@@ -606,11 +590,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
     // (tutti ON), così un link ?config= con "ranking=0" mostrava comunque il badge
     // trend. Con un config token la personalizzazione è esplicita → i flag off
     // devono valere.
-    const hasQueryEarly = !!queryPoster || !!mapping || !!configToken
+    const hasQueryEarly = !!queryPoster || !!mapping
     const badgesEnabledEarly = hasQueryEarly ? (qBadgesEarly !== null ? qBadgesEarly !== "0" : showBadges) : true
     const rankingEnabledEarly = hasQueryEarly ? (qRankingEarly !== null ? qRankingEarly !== "0" : rankingBadges) : true
     const qMqEarly = req.nextUrl.searchParams.get("mq")
-    const manualQuality = qMqEarly !== null ? qMqEarly : (mapping?.manualQuality ?? configOverride?.manualQuality ?? sd.manualQuality ?? null)
+    const manualQuality = qMqEarly !== null ? qMqEarly : (mapping?.manualQuality ?? sd.manualQuality ?? null)
 
     // Rank anime inviato dal client nella preview WYSIWYG (override del fetch).
     const qAnimeRankParam = req.nextUrl.searchParams.get("animerank")
@@ -750,7 +734,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
     const finalRank = qRank !== null ? (parseInt(qRank, 10) >= 0 ? parseInt(qRank, 10) : rankingRank) : rankingRank
 
     // 6. Resize poster + compute luminance
-    const posterBuf = await sharp(originalBuf).resize(STD_W, STD_H, { fit: 'cover', position: 'centre' }).toBuffer()
+    const posterTransform = resolvePosterTransform(req.nextUrl.searchParams, mapping)
+    const crop = posterCropWindow(STD_W, STD_H, posterTransform)
+    const posterBuf = posterTransform.posterScale === 100
+      ? await sharp(originalBuf).resize(STD_W, STD_H, { fit: 'cover', position: 'centre' }).toBuffer()
+      : await sharp(originalBuf)
+          .resize(crop.scaledW, crop.scaledH, { fit: 'cover', position: 'centre' })
+          .extract({ left: crop.left, top: crop.top, width: STD_W, height: STD_H })
+          .toBuffer()
     const qTopLight = req.nextUrl.searchParams.get("tl")
 
     // Apply mapping TV metadata (synchronous — no race, no side-effects in parallel closures)
@@ -803,9 +794,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
     const renderConfig = resolvePosterRenderConfig({
       searchParams: req.nextUrl.searchParams,
       mapping,
-      configOverride,
       sd,
-      hasQuery: !!queryPoster || !!mapping || !!configToken,
+      hasQuery: !!queryPoster || !!mapping,
       showBadges,
       rankingBadges,
       animeRank: animeRankResult,
@@ -819,7 +809,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
       blurEnabled, blurHeight, blurIntensity, blurFade, blurDarkness,
       badgesEnabled, rankingEnabled,
       badgeGenre, badgeYear, badgeRating, badgeFormat,
-      logoScale, logoOffsetX, logoOffsetY,
+      logoScale, logoOffsetX, logoOffsetY, omitLogo,
       queryExtra, qNetLogo, networkLogo, ribbonSide,
     } = renderConfig
 
@@ -952,7 +942,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
       badgesEnabled, rankingEnabled, genreName, voteAverage, badgeStyle,
       rankingBadgeStyle, badgeGenre, badgeYear, badgeRating, manualQuality, badgeFormat,
       topLight, targetCenter, ribbonSide,
-      logoScale, logoOffsetX, logoOffsetY,
+      logoScale, logoOffsetX, logoOffsetY, omitLogo,
       mediaType: mediaType as "movie" | "tv",
       finalRank, animeRankResult, rankingResult,
       mapping, tmdbNetworks, productionCompanies, tmdbStudios,
@@ -980,7 +970,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
     // 11. Cache + response
     const payload = { buffer: composited, etag }
     const mappingTag = `poster:${mediaType}:${tmdbId}`
-    writeCachedPoster(cacheKey, payload, mappingTag, outputFormat, isPreview, topLight)
+    writeCachedPoster(cacheKey, payload, mappingTag)
     completePosterRender(payload)
     recordPosterRequest(false, outputFormat)
     log.info("Poster rendered", { mediaType, tmdbId, ms: Date.now() - startTime, bytes: composited.byteLength, cached: !!mappingTag, format: outputFormat })

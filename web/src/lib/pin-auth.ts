@@ -17,8 +17,6 @@ function getDataDir(): string {
   return envWithFallback("DATA_DIR") || DATA_DIR
 }
 
-const useKv = !!process.env.KV_REST_API_URL && !!process.env.KV_REST_API_TOKEN
-const KV_KEY = "security"
 
 export const PIN_COOKIE_NAME = "pictorium_pin_session"
 const SESSION_DURATION_SECONDS = 30 * 24 * 60 * 60 // 30 giorni
@@ -44,19 +42,6 @@ export async function readSecurityConfig(): Promise<SecurityConfig> {
     return cachedConfig
   }
 
-  if (useKv) {
-    try {
-      const { kv } = await import("@vercel/kv")
-      const data = await kv.get<SecurityConfig>(KV_KEY)
-      cachedConfig = data ?? {}
-      cacheAt = now
-      return cachedConfig
-    } catch (err) {
-      log.error("Failed to read security config from KV", { err })
-      return {}
-    }
-  }
-
   try {
     const file = getSecurityFile()
     if (!existsSync(file)) {
@@ -79,23 +64,20 @@ export function readSecurityConfigSync(): SecurityConfig {
   if (cachedConfig && now - cacheAt < CACHE_TTL_MS) {
     return cachedConfig
   }
-  if (!useKv) {
-    try {
-      const file = getSecurityFile()
-      if (!existsSync(file)) {
-        cachedConfig = {}
-        cacheAt = now
-        return cachedConfig
-      }
-      const raw = readFileSync(file, "utf-8")
-      cachedConfig = JSON.parse(raw) as SecurityConfig
+  try {
+    const file = getSecurityFile()
+    if (!existsSync(file)) {
+      cachedConfig = {}
       cacheAt = now
       return cachedConfig
-    } catch {
-      return {}
     }
+    const raw = readFileSync(file, "utf-8")
+    cachedConfig = JSON.parse(raw) as SecurityConfig
+    cacheAt = now
+    return cachedConfig
+  } catch {
+    return {}
   }
-  return cachedConfig ?? {}
 }
 
 export function getAdminPinFromEnv(): string | null {
@@ -148,19 +130,17 @@ export function getSessionSecretSync(): string {
   // PIN da env senza segreto salvato: genera un segreto casuale e persistilo.
   // Prima il segreto era sha256(costante + PIN): con un PIN corto chiunque
   // avesse un cookie poteva ricavare il PIN offline e forgiare sessioni.
-  if (!useKv) {
-    try {
-      const file = getSecurityFile()
-      const sessionSecret = crypto.randomBytes(32).toString("hex")
-      const updated: SecurityConfig = { ...cfg, sessionSecret, updatedAt: new Date().toISOString() }
-      mkdirSync(getDataDir(), { recursive: true })
-      writeFileSync(file, JSON.stringify(updated, null, 2), "utf-8")
-      cachedConfig = updated
-      cacheAt = Date.now()
-      return sessionSecret
-    } catch (err) {
-      log.warn("Cannot persist session secret — sessions reset on restart", { err })
-    }
+  try {
+    const file = getSecurityFile()
+    const sessionSecret = crypto.randomBytes(32).toString("hex")
+    const updated: SecurityConfig = { ...cfg, sessionSecret, updatedAt: new Date().toISOString() }
+    mkdirSync(getDataDir(), { recursive: true })
+    writeFileSync(file, JSON.stringify(updated, null, 2), "utf-8")
+    cachedConfig = updated
+    cacheAt = Date.now()
+    return sessionSecret
+  } catch (err) {
+    log.warn("Cannot persist session secret — sessions reset on restart", { err })
   }
   return processSessionSecret
 }
@@ -188,19 +168,6 @@ export async function writeSecurityConfig(config: SecurityConfig): Promise<void>
   const updated: SecurityConfig = {
     ...config,
     updatedAt: new Date().toISOString(),
-  }
-
-  if (useKv) {
-    try {
-      const { kv } = await import("@vercel/kv")
-      await kv.set(KV_KEY, updated)
-      cachedConfig = updated
-      cacheAt = Date.now()
-      return
-    } catch (err) {
-      log.error("Failed to write security config to KV", { err })
-      throw err
-    }
   }
 
   try {

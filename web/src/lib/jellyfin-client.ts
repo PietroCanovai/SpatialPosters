@@ -26,6 +26,13 @@ export interface JellyfinItemDto {
   imageTag: string | null
 }
 
+export interface PushResult {
+  ok: true
+  items: { id: string; name: string }[]
+  bytes: number
+  designed: boolean
+}
+
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(path, {
     ...init,
@@ -51,10 +58,17 @@ export const jellyfinApi = {
     return call<{ items: JellyfinItemDto[]; total: number }>(`/api/jellyfin/items?${q}`)
   },
   push: (itemId: string, tmdbKey: string, lang: string, mdblistKey?: string) =>
-    call<{ ok: true; bytes: number; designed: boolean }>("/api/jellyfin/push", {
+    call<PushResult>("/api/jellyfin/push", {
       method: "POST",
       headers: { "x-api-key": tmdbKey },
       body: JSON.stringify({ itemId, lang, mdblistKey: mdblistKey || undefined }),
+    }),
+  /** Invia il poster di un titolo TMDB a tutti gli item Jellyfin corrispondenti. */
+  pushTitle: (tmdbId: number, mediaType: "movie" | "tv", tmdbKey: string, lang: string, mdblistKey?: string) =>
+    call<PushResult>("/api/jellyfin/push", {
+      method: "POST",
+      headers: { "x-api-key": tmdbKey },
+      body: JSON.stringify({ tmdbId, mediaType, lang, mdblistKey: mdblistKey || undefined }),
     }),
 }
 

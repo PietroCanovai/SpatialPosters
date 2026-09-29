@@ -4,8 +4,7 @@ import { useState } from "react"
 import { PICKER_LANGS } from "@/lib/utils"
 import { REGIONS } from "@/lib/regions"
 import { useT } from "@/lib/contexts/TranslationContext"
-import { AnimatedSpatialWord } from "@/components/AnimatedSpatialWord"
-import { ChevronLeft, ArrowRight, Sparkles, Languages, MapPin, Check } from "lucide-react"
+import { ChevronLeft, ArrowRight, Languages, MapPin, Check } from "lucide-react"
 
 interface SetupWizardProps {
   /** Applica la lingua (codice 2 lettere) senza chiudere il wizard. */
@@ -68,13 +67,6 @@ export function LangPicker({ onPickLang, onPickRegion, onDone }: SetupWizardProp
 
           {/* Rebranded Header */}
           <div className="text-center mb-7 relative">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.06] border border-white/12 backdrop-blur-md mb-4 shadow-sm">
-              <Sparkles className="w-3.5 h-3.5 text-accent-orange animate-pulse" />
-              <span className="text-[11px] font-semibold tracking-wider text-zinc-300 uppercase">
-                Welcome to <AnimatedSpatialWord />
-              </span>
-            </div>
-
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
               {getTitle()}
             </h2>

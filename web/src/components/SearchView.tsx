@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { usePSelector } from "@/lib/context"
 import { useT } from "@/lib/contexts/TranslationContext"
 import { useSearchCtx } from "@/lib/contexts/SearchContext"
@@ -14,6 +15,8 @@ import { PosterDepthEdge } from "@/components/PosterDepthGlow"
 export function SearchView() {
   const { t } = useT()
   const s = useSearchCtx()
+  const router = useRouter()
+  const urlQuery = useSearchParams().get("q")?.trim() ?? ""
   const { setQuery } = s
   const tmdbKey = usePSelector((v) => v.tmdbKey)
   const mappingsMap = usePSelector((v) => v.mappingsMap)
@@ -37,16 +40,19 @@ export function SearchView() {
     }
   }, [])
 
-  // Deep-link ?q=: precompila la ricerca dalla URL (es. /search?q=interstellar)
+  // La ricerca segue ?q= della URL: deep-link e Indietro/Avanti tra ricerche.
+  // Aspetta la chiave TMDB: all'apertura della pagina arriva in modo asincrono
+  // (localStorage / chiavi salvate sul server) e cercare senza chiave non dà risultati.
+  const lastUrlQueryRef = useRef("")
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const q = params.get("q")?.trim() ?? ""
-    if (q.length >= 2) {
-      s.setQuery(q)
-      s.doSearch(q)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al mount
-  }, [])
+    if (!tmdbKey || urlQuery.length < 2) return
+    const key = `${urlQuery}|${tmdbKey}`
+    if (key === lastUrlQueryRef.current) return
+    lastUrlQueryRef.current = key
+    s.setQuery(urlQuery)
+    s.doSearch(urlQuery)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al cambio di ?q= o della chiave
+  }, [urlQuery, tmdbKey])
 
   const showRecent = searchFocused && s.recentSearches.length > 0
 
@@ -67,8 +73,9 @@ export function SearchView() {
           value={s.query}
           onChange={handleQueryChange}
           onSearch={(q) => {
-            s.setQuery(q)
-            s.doSearch(q)
+            // La query sta nell'URL: Indietro/Avanti tornano alle ricerche
+            // precedenti. L'effetto su ?q= esegue la ricerca.
+            router.push(`/search?q=${encodeURIComponent(q.trim())}`)
           }}
           large
           onFocus={() => setSearchFocused(true)}

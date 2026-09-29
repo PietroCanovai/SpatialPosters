@@ -1,4 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+/* Inter servito localmente (@fontsource): nessuna richiesta a Google Fonts. */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/inter/800.css";
+@import "@fontsource/inter/900.css";
 @import "tailwindcss";
 
 @theme inline {
@@ -753,8 +759,17 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
 }
 
-/* Smooth edge fade mask for horizontal scroll bars */
-.scroll-fade-mask {
+/* Edge fade for horizontal scroll rows — only on a side that actually hides
+   content (data-fade-* set by ScrollFadeManager). No overflow = no fade. */
+.scroll-fade-mask[data-fade-left="1"][data-fade-right="0"] {
+  mask-image: linear-gradient(to right, transparent 0px, #000 12px);
+  -webkit-mask-image: linear-gradient(to right, transparent 0px, #000 12px);
+}
+.scroll-fade-mask[data-fade-left="0"][data-fade-right="1"] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 12px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 12px), transparent 100%);
+}
+.scroll-fade-mask[data-fade-left="1"][data-fade-right="1"] {
   mask-image: linear-gradient(to right, transparent 0px, #000 12px, #000 calc(100% - 12px), transparent 100%);
   -webkit-mask-image: linear-gradient(to right, transparent 0px, #000 12px, #000 calc(100% - 12px), transparent 100%);
 }
@@ -2649,3 +2664,23 @@ html.light-mode .noise-overlay {
 
 
 
+
+/* Native dropdowns: Chromium draws the <select> popup with the OS light
+   theme unless the page declares a colour scheme, which left light text on a
+   light list in dark mode. */
+:root {
+  color-scheme: dark;
+}
+html.light-mode {
+  color-scheme: light;
+}
+select option,
+select optgroup {
+  background-color: #18181b;
+  color: #f4f4f5;
+}
+html.light-mode select option,
+html.light-mode select optgroup {
+  background-color: #ffffff;
+  color: #18181b;
+}

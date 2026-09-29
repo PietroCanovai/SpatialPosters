@@ -3,14 +3,10 @@ import path from "node:path"
 import { NextResponse } from "next/server"
 import { rateLimit, rateLimitKey, rateLimitResponse } from "@/lib/rate-limit"
 import { DATA_DIR } from "@/lib/data-dir"
-import { getAll, getStorageMode } from "@/lib/store"
+import { getAll } from "@/lib/store"
 import { checkTmdbEndpoint } from "@/lib/tmdb"
 import { getJWRankings } from "@/lib/justwatch"
 import { getTop10 } from "@/lib/flixpatrol"
-import { getServerDefaults } from "@/lib/server-defaults"
-import { getR2Config } from "@/lib/r2-storage"
-import { isImgBBConfigured } from "@/lib/imgbb-storage"
-import { isCloudinaryConfigured, getCloudinaryConfig } from "@/lib/cloudinary-storage"
 
 export const dynamic = "force-dynamic"
 
@@ -129,7 +125,7 @@ export async function GET(request: Request) {
     .sort()
     .at(-1) ?? null
 
-  const storageMode = getStorageMode()
+  const storageMode = "file" as const
 
   const storage = {
     mode: storageMode,
@@ -146,17 +142,6 @@ export async function GET(request: Request) {
     mappingCount: mappings.length,
     mappingsCount: mappings.length,
     lastMappingUpdatedAt,
-    r2: {
-      configured: !!getR2Config(),
-      bucket: getR2Config()?.bucket ?? null,
-    },
-    cloudinary: {
-      configured: isCloudinaryConfigured(),
-      cloudName: getCloudinaryConfig()?.cloudName ?? null,
-    },
-    imgbb: {
-      configured: isImgBBConfigured(),
-    },
   }
 
   const health = {
@@ -170,7 +155,7 @@ export async function GET(request: Request) {
     storage,
   }
 
-  const storageOk = storageMode === "kv" || storage.dataDirWritable || storage.mappingCount === 0
+  const storageOk = storage.dataDirWritable || storage.mappingCount === 0
   const statusCode = tmdbTrending.ok && tmdbSearch.ok && storageOk ? 200 : 503
   return NextResponse.json(health, { status: statusCode })
 }

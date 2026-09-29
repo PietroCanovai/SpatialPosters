@@ -14,14 +14,13 @@ const log = createLogger("provider-keys")
  * sull'ambiente.
  */
 
-export const PROVIDERS = ["tmdb", "mdblist", "tvdb"] as const
+export const PROVIDERS = ["tmdb", "mdblist"] as const
 export type Provider = (typeof PROVIDERS)[number]
 export type ProviderKeys = Partial<Record<Provider, string>>
 
 const ENV_NAME: Record<Provider, string> = {
   tmdb: "SPATIALPOSTERS_TMDB_KEY",
   mdblist: "SPATIALPOSTERS_MDBLIST_KEY",
-  tvdb: "SPATIALPOSTERS_TVDB_API_KEY",
 }
 
 function file(): string {
@@ -68,7 +67,6 @@ export function effectiveProviderKeys(): Record<Provider, string> {
   return {
     tmdb: process.env.SPATIALPOSTERS_TMDB_KEY || process.env.TMDB_API_KEY || process.env.TMDB_KEY || "",
     mdblist: process.env.SPATIALPOSTERS_MDBLIST_KEY || process.env.MDBLIST_API_KEY || process.env.MDBLIST_KEY || "",
-    tvdb: process.env.SPATIALPOSTERS_TVDB_API_KEY || process.env.TVDB_API_KEY || "",
   }
 }
 
@@ -81,17 +79,8 @@ export async function validateProviderKey(provider: Provider, key: string): Prom
       const data = res.ok ? await res.json().catch(() => null) : null
       return data?.success === true ? { valid: true } : { valid: false, message: "TMDB rejected this key" }
     }
-    if (provider === "mdblist") {
-      const res = await fetch(`https://api.mdblist.com/user?apikey=${k}`, { signal: AbortSignal.timeout(8000) })
-      return res.ok ? { valid: true } : { valid: false, message: "MDBList rejected this key" }
-    }
-    const res = await fetch("https://api4.thetvdb.com/v4/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ apikey: key.trim() }),
-      signal: AbortSignal.timeout(8000),
-    })
-    return res.ok ? { valid: true } : { valid: false, message: "TVDB rejected this key" }
+    const res = await fetch(`https://api.mdblist.com/user?apikey=${k}`, { signal: AbortSignal.timeout(8000) })
+    return res.ok ? { valid: true } : { valid: false, message: "MDBList rejected this key" }
   } catch (e) {
     return { valid: false, message: `Could not reach ${provider.toUpperCase()} (${e instanceof Error ? e.message : String(e)})` }
   }

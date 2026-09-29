@@ -31,6 +31,9 @@ const nextConfig: NextConfig = {
   // React Compiler: ottimizza automaticamente il re-rendering dei componenti,
   // riducendo la necessita' di useMemo/useCallback manuali.
   reactCompiler: true,
+  // `next dev` altrimenti genera AGENTS.md/CLAUDE.md in web/: le istruzioni
+  // per gli agenti stanno solo nel CLAUDE.md alla radice del repo.
+  agentRules: false,
   // DistDir separato per i test E2E (playwright.config.ts): evita il lock
   // "Another next dev server is already running" quando l'utente ha già un
   // `npm run dev` attivo su .next.

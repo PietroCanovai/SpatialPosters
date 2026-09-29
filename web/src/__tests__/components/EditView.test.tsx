@@ -2,8 +2,9 @@ import { describe, it, expect } from "vitest"
 import { screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import EditView from "@/components/EditView"
+import { HomeView } from "@/components/HomeView"
 import { renderWithCtx } from "@/__tests__/test-utils"
-import type { SearchResult } from "@/lib/types"
+import type { SearchResult, TMDBImage } from "@/lib/types"
 
 const mockSelected: SearchResult = {
   id: 550,
@@ -13,53 +14,56 @@ const mockSelected: SearchResult = {
   poster_path: "/fc.jpg",
   release_date: "1999-10-15",
 }
+const clean: TMDBImage = { file_path: "/clean.jpg", iso_639_1: null, vote_average: 0, width: 2000, height: 3000 }
 
-describe("EditView", () => {
-  it("shows search bar when no item selected", () => {
-    renderWithCtx(<EditView />)
+describe("HomeView", () => {
+  it("shows the search bar", () => {
+    renderWithCtx(<HomeView />)
     expect(screen.getByPlaceholderText("ui.searchPlaceholderLarge")).toBeInTheDocument()
   })
 
-  it("shows no key message when no tmdbKey", () => {
-    renderWithCtx(<EditView />, { tmdbKey: "" })
+  it("asks for a TMDB key when none is set", () => {
+    renderWithCtx(<HomeView />, { tmdbKey: "" })
     expect(screen.getByText("ui.noKey")).toBeInTheDocument()
   })
 
-  it("shows compatible platforms when no item selected and has tmdbKey", () => {
-    renderWithCtx(<EditView />)
-    const title = screen.getByRole("heading", { level: 2, name: /Compatible Platforms/i })
-    expect(title).toBeInTheDocument()
+  it("has no Stremio or animated branding", () => {
+    const { container } = renderWithCtx(<HomeView />)
+    expect(container.textContent).not.toMatch(/stremio|compatible platforms|enhance your poster/i)
+  })
+})
+
+describe("EditView", () => {
+  it("renders nothing without a selected title", () => {
+    const { container } = renderWithCtx(<EditView />)
+    expect(container).toBeEmptyDOMElement()
   })
 
-  it("shows preview section when item selected", () => {
-    renderWithCtx(<EditView />, { selected: mockSelected })
+  it("shows the title, the live preview and a single Send to Jellyfin action", () => {
+    renderWithCtx(<EditView />, { selected: mockSelected, previewPoster: clean })
+    expect(screen.getByText("Fight Club")).toBeInTheDocument()
     expect(screen.getAllByText("ui.previewLive")[0]).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /send to jellyfin/i })).toBeEnabled()
+    expect(screen.queryByText("ui.savePoster")).not.toBeInTheDocument()
+    expect(screen.queryByText("ui.testUrl")).not.toBeInTheDocument()
   })
 
-  it("shows title when item selected", () => {
+  it("can send even before a poster is picked (the server picks the best one, as in the preview)", () => {
     renderWithCtx(<EditView />, { selected: mockSelected })
-    expect(screen.getAllByText("Fight Club")[0]).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /send to jellyfin/i })).toBeEnabled()
   })
 
-  it("shows save poster button when item selected with previewPoster", () => {
-    renderWithCtx(<EditView />, {
-      selected: mockSelected,
-      previewPoster: { file_path: "/clean.jpg", iso_639_1: null, vote_average: 0, width: 1000, height: 1500 },
-    })
-    expect(screen.getAllByText("ui.savePoster")[0]).toBeInTheDocument()
+  it("shows the image size on poster tiles", () => {
+    renderWithCtx(<EditView />, { selected: mockSelected, posters: [clean], previewPoster: clean })
+    expect(screen.getAllByText("2000×3000")[0]).toBeInTheDocument()
   })
 
-  it("switches right tab on click", async () => {
+  it("offers the transform tab (poster zoom) even without a logo", async () => {
     const u = userEvent.setup()
-    renderWithCtx(<EditView />, {
-      selected: mockSelected,
-      posters: [{ file_path: "/clean.jpg", iso_639_1: null, vote_average: 0, width: 1000, height: 1500 }],
-      previewPoster: { file_path: "/clean.jpg", iso_639_1: null, vote_average: 0, width: 1000, height: 1500 },
-      selectedLogo: { file_path: "/logo.png", iso_639_1: "en", vote_average: 0, width: 200, height: 100 },
-    })
-    const transformTabs = screen.getAllByText("ui.transform")
-    const desktopTransformTab = transformTabs.find((el) => el.closest(".tab-chip")) || transformTabs[0]
-    await u.click(desktopTransformTab)
-    expect(desktopTransformTab.closest("button")).toHaveClass("tab-chip-active")
+    renderWithCtx(<EditView />, { selected: mockSelected, posters: [clean], previewPoster: clean })
+    const tab = screen.getByRole("button", { name: "ui.transform" })
+    await u.click(tab)
+    expect(tab).toHaveClass("tab-chip-active")
+    expect(screen.getByText("Zoom in to move the poster.")).toBeInTheDocument()
   })
 })

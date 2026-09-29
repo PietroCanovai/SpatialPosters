@@ -17,8 +17,6 @@ export interface SettingsCtx {
   setShowKey: React.Dispatch<React.SetStateAction<boolean>>
   mdblistApiKey: string
   setMdblistApiKey: (v: string) => void
-  tvdbApiKey: string
-  setTvdbApiKey: (v: string) => void
   theme: "dark" | "light"
   setTheme: React.Dispatch<React.SetStateAction<"dark" | "light">>
   uiAccent: boolean
@@ -56,8 +54,6 @@ export function SettingsProvider({
       setShowKey: value.setShowKey,
       mdblistApiKey: value.mdblistApiKey,
       setMdblistApiKey: value.setMdblistApiKey,
-      tvdbApiKey: value.tvdbApiKey,
-      setTvdbApiKey: value.setTvdbApiKey,
       theme: value.theme,
       setTheme: value.setTheme,
       uiAccent: value.uiAccent,
@@ -74,7 +70,6 @@ export function SettingsProvider({
       value.tmdbKeyInput, value.setTmdbKeyInput,
       value.showKey, value.setShowKey,
       value.mdblistApiKey, value.setMdblistApiKey,
-      value.tvdbApiKey, value.setTvdbApiKey,
       value.theme, value.setTheme,
       value.uiAccent, value.setUiAccent,
       value.lang,

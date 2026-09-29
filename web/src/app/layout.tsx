@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
+import { ScrollFadeManager } from "@/components/ScrollFadeManager";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://spatialposters.app"),
-  title: "SpatialPosters — Dynamic Poster Generator for Stremio",
-  description: "Dynamic movie & TV show poster generator for Stremio: clean posters, vector logos, rating badges, and trend badges rendered in real time.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://127.0.0.1:7272"),
+  title: "SpatialPosters",
+  description: "Design movie and TV posters and send them to Jellyfin.",
   manifest: "/site.webmanifest",
   icons: {
     icon: [
@@ -31,11 +32,11 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "SpatialPosters",
-    description: "Dynamic poster generator for Stremio",
+    description: "Design posters and send them to Jellyfin",
     images: ["/SpatialPosters.png"],
     type: "website",
   },
-  robots: { index: true, follow: true },
+  robots: { index: false, follow: false },
 };
 
 export const viewport: Viewport = {
@@ -63,6 +64,7 @@ export default function RootLayout({
           Skip to main content
         </a>
         <main id="main-content">{children}</main>
+        <ScrollFadeManager />
         <Toaster
           position="bottom-center"
           toastOptions={{

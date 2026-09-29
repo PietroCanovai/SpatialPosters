@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { usePSelector } from "@/lib/context"
 import { useT } from "@/lib/contexts/TranslationContext"
 import { posterUrl } from "@/lib/utils"
@@ -14,7 +15,7 @@ interface SavedPostersBundleProps {
 
 export function SavedPostersBundle({ onOpenLightbox }: SavedPostersBundleProps) {
   const mappings = usePSelector((v) => v.mappings)
-  const router = usePSelector((v) => v.router)
+  const router = useRouter()
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
   const [containerHovered, setContainerHovered] = useState(false)
   const { t } = useT()
@@ -34,7 +35,7 @@ export function SavedPostersBundle({ onOpenLightbox }: SavedPostersBundleProps) 
     if (onOpenLightbox) {
       onOpenLightbox(m)
     } else {
-      router.push("myposters")
+      router.push("/myposters")
     }
   }
 

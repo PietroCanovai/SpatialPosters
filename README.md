@@ -5,10 +5,10 @@ A Windows desktop build of [SpatialPosters](https://github.com/TheAceOfficials/S
 ## Getting started
 
 1. Run **`SpatialPosters.exe`**. It's portable, so there's nothing to install. The first launch unpacks itself once (a few seconds), and later launches open in under a second.
-2. Open **Settings → API keys** and add your **TMDB** key (required, free at themoviedb.org → Settings → API). Optionally add **MDBList** for IMDb/Rotten Tomatoes/Letterboxd ratings on badges, and **TVDB** for TVDB episode ordering. Each key is checked with the provider when you save.
+2. Open **Settings → API keys** and add your **TMDB** key (required, free at themoviedb.org → Settings → API). Optionally add **MDBList** for IMDb/Rotten Tomatoes/Letterboxd ratings on badges. Each key is checked with the provider when you save.
 3. Open **Jellyfin** in the sidebar and enter your server URL (e.g. `http://192.168.1.10:8096`) and an API key. Create the key in Jellyfin under **Dashboard → API Keys → +**.
 4. Pick a library, then:
-   - **Design** opens the poster editor for that title. Save your design, then press **Send to Jellyfin**.
+   - **Design** opens the poster editor for that title. Pick a poster and logo, adjust badges and the Transform (zoom/move the poster and logo), then press **Send to Jellyfin** (Ctrl+S). You can also search any title from the home page and send it the same way.
    - **Send** uploads a poster using your saved design, or your default style if you haven't designed that title.
    - **Send all to Jellyfin** does the whole library, or the current search.
 
@@ -20,9 +20,9 @@ Your data (designs, defaults, API keys, Jellyfin connection) lives in `%APPDATA%
 
 ## What's different from upstream
 
-- Windows desktop app with Jellyfin upload.
-- Security fixes: SSRF in the image proxy and poster routes, a PIN lock that wasn't enforced, and a broken addon proxy.
-- Privacy: Reddit lookups are opt-in, Next.js telemetry is off, and the Patreon buttons are gone.
+- Windows desktop app with Jellyfin upload. Everything Stremio/addon-related and the cloud-hosting backends are removed.
+- Security fixes: SSRF in the image proxy and poster routes, a PIN lock that wasn't enforced, and a broken DNS-pinned fetch.
+- Privacy: Reddit lookups are opt-in, Next.js telemetry is off, fonts load locally (no Google Fonts), and the Patreon buttons are gone.
 - Only Italy, the UK, the USA and Japan are offered as regions, and only Italian, English and Japanese as UI languages.
 
 ## Layout

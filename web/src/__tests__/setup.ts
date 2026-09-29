@@ -147,3 +147,10 @@ vi.mock("@/lib/i18n", () => ({
   isRankKey: () => null,
   BADGE_KEY_PREFIX: "__",
 }))
+
+// Le schermate usano il router App di Next (route vere per ogni pagina).
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+}))

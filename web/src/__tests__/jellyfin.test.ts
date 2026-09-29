@@ -65,3 +65,35 @@ describe("jellyfin client", () => {
     await expect(getServerInfo(cfg)).rejects.toThrow(/Cannot reach Jellyfin at http:\/\/192\.168\.1\.10:8096 \(ECONNREFUSED\)/)
   })
 })
+
+describe("findItemsByTmdb", () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it("uses the provider-id filter and verifies the TMDB id", async () => {
+    const { findItemsByTmdb, clearTmdbIndex } = await import("@/lib/jellyfin")
+    clearTmdbIndex()
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({
+      Items: [
+        { Id: "a".repeat(32), Name: "Fight Club", Type: "Movie", ProviderIds: { Tmdb: "550" } },
+        { Id: "b".repeat(32), Name: "Other", Type: "Movie", ProviderIds: { Tmdb: "551" } },
+      ],
+    }))
+    const hits = await findItemsByTmdb(cfg, "movie", 550)
+    expect(hits.map((h) => h.id)).toEqual(["a".repeat(32)])
+    expect(new URL(String(spy.mock.calls[0][0])).searchParams.get("AnyProviderIdEquals")).toBe("Tmdb.550")
+  })
+
+  it("falls back to scanning the library when the filter finds nothing", async () => {
+    const { findItemsByTmdb, clearTmdbIndex } = await import("@/lib/jellyfin")
+    clearTmdbIndex()
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ Items: [] }))
+      .mockResolvedValueOnce(Response.json({
+        Items: [{ Id: "c".repeat(32), Name: "Show", Type: "Series", ProviderIds: { tmdb: "1399" } }],
+        TotalRecordCount: 1,
+      }))
+    const hits = await findItemsByTmdb(cfg, "tv", 1399)
+    expect(hits).toHaveLength(1)
+    expect(hits[0].name).toBe("Show")
+  })
+})

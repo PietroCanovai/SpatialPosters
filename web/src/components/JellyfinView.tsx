@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { Check, Loader2, Palette, Search, Send, Server, Unplug, X } from "lucide-react"
 import { usePSelector } from "@/lib/context"
+import { rememberItemSummary } from "@/lib/useNavigation"
 import { getLang } from "@/lib/i18n"
 import {
   jellyfinApi, jellyfinImageUrl,
@@ -118,7 +119,7 @@ function ItemCard({ item, push, bust, onSend }: {
   bust?: number
   onSend: () => void
 }) {
-  const editorHref = item.tmdbId ? `/${item.type === "tv" ? "tv" : "movie"}/${item.tmdbId}?jf=${item.id}` : null
+  const editorHref = item.tmdbId ? `/${item.type === "tv" ? "tv" : "movie"}/${item.tmdbId}` : null
   return (
     <div className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
       <div className="relative aspect-[2/3] bg-black/40">
@@ -145,7 +146,7 @@ function ItemCard({ item, push, bust, onSend }: {
           <p className="text-[11px] text-amber-300">No TMDB id — identify it in Jellyfin.</p>
         ) : (
           <div className="mt-auto grid grid-cols-2 gap-1.5">
-            <Link href={editorHref!} className="inline-flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.05] py-1.5 text-[11px] font-semibold text-zinc-200 hover:bg-white/[0.1]">
+            <Link href={editorHref!} onClick={() => rememberItemSummary({ id: item.tmdbId!, media_type: item.type, title: item.name, name: item.name, poster_path: null, release_date: item.year ? `${item.year}-01-01` : undefined, first_air_date: item.year ? `${item.year}-01-01` : undefined })} className="inline-flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.05] py-1.5 text-[11px] font-semibold text-zinc-200 hover:bg-white/[0.1]">
               <Palette className="h-3.5 w-3.5" /> Design
             </Link>
             <button

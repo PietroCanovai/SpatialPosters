@@ -194,7 +194,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1440,
     height: 900,
-    minWidth: 960,
+    minWidth: 1100,
     minHeight: 640,
     show: false,
     backgroundColor: "#09090b",
@@ -220,6 +220,24 @@ function createWindow() {
       openExternalSafe(url)
     }
   })
+  // Mouse back/forward buttons arrive as app-commands on Windows; Electron
+  // doesn't act on them by itself. Alt+Left/Right do the same.
+  const history = win.webContents.navigationHistory
+  const go = (dir) => {
+    if (dir < 0 && history.canGoBack()) history.goBack()
+    if (dir > 0 && history.canGoForward()) history.goForward()
+  }
+  win.on("app-command", (_event, command) => {
+    if (command === "browser-backward") go(-1)
+    else if (command === "browser-forward") go(1)
+  })
+  win.webContents.on("before-input-event", (event, input) => {
+    if (input.type === "keyDown" && input.alt && (input.key === "ArrowLeft" || input.key === "ArrowRight")) {
+      event.preventDefault()
+      go(input.key === "ArrowLeft" ? -1 : 1)
+    }
+  })
+
   win.once("ready-to-show", () => win.show())
   win.on("closed", () => { win = null })
   win.loadURL(SPLASH)
@@ -257,5 +275,9 @@ app.whenReady().then(async () => {
     app.quit()
     return
   }
-  if (win) win.loadURL(origin)
+  if (win) {
+    // Drop the splash page from history so Back on the first page does nothing.
+    win.webContents.once("did-finish-load", () => win?.webContents.navigationHistory.clear())
+    win.loadURL(origin)
+  }
 })

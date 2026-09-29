@@ -62,6 +62,10 @@ export interface Mapping {
   logoScale?: number | null
   logoOffsetX?: number | null
   logoOffsetY?: number | null
+  /** Zoom (%) e pan (px del canvas 500×750) del poster sotto il logo. */
+  posterScale?: number | null
+  posterOffsetX?: number | null
+  posterOffsetY?: number | null
   backdropPath?: string | null
   backdropScale?: number | null
   backdropOffsetX?: number | null

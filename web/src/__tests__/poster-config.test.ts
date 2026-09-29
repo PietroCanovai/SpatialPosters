@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest"
-import { resolvePosterRenderConfig, clamp, type PosterRenderConfigInput } from "@/lib/poster-config"
+import {
+  resolvePosterRenderConfig, resolvePosterTransform, posterCropWindow, clamp, type PosterRenderConfigInput,
+} from "@/lib/poster-config"
 import type { Mapping } from "@/lib/types"
-import type { PictoriumUserConfig } from "@/lib/config-token"
 
 function baseInput(overrides: Partial<PosterRenderConfigInput> = {}): PosterRenderConfigInput {
   return {
     searchParams: new URLSearchParams(),
     mapping: null,
-    configOverride: null,
     sd: {},
     hasQuery: true,
     showBadges: true,
@@ -22,22 +22,6 @@ function baseInput(overrides: Partial<PosterRenderConfigInput> = {}): PosterRend
 const mapping = (partial: Partial<Mapping> = {}): Mapping => ({
   tmdbId: 1, mediaType: "movie", title: "T", posterPath: "/p.jpg",
   logoPath: null, originalPosterPath: null, language: null, updatedAt: "2026-01-01",
-  ...partial,
-})
-
-const config = (partial: Partial<PictoriumUserConfig> = {}): PictoriumUserConfig => ({
-  globalBadges: true,
-  rankingBadges: true,
-  badgeStyle: "shadow",
-  rankingBadgeStyle: "default",
-  blurEnabled: true,
-  blurIntensity: 5,
-  blurFade: 60,
-  blurDarkness: 40,
-  gradientHeight: 30,
-  networkLogo: true,
-  autoRotateClean: false,
-  logoFitEnabled: false,
   ...partial,
 })
 
@@ -63,41 +47,38 @@ describe("resolvePosterRenderConfig", () => {
     expect(r.rankingEnabled).toBe(true)
     expect(r.ribbonSide).toBe("left")
     expect(r.queryExtra).toBeNull()
+    expect(r.omitLogo).toBe(false)
+    expect([r.posterScale, r.posterOffsetX, r.posterOffsetY]).toEqual([100, 0, 0])
   })
 
-  it("query bs beats mapping, config token and server defaults", () => {
+  it("query bs beats mapping and server defaults", () => {
     const r = resolvePosterRenderConfig(baseInput({
       searchParams: new URLSearchParams({ bs: "pill" }),
       mapping: mapping({ badgeStyle: "colored" }),
-      configOverride: config({ badgeStyle: "bar" }),
       sd: { badgeStyle: "bordo" },
     }))
     expect(r.badgeStyle).toBe("pill")
   })
 
-  it("query rs beats mapping, config token and server defaults", () => {
+  it("query rs beats mapping and server defaults", () => {
     // M6: come per bs, la query `rs` vince sul mapping salvato (WYSIWYG).
     const r = resolvePosterRenderConfig(baseInput({
       searchParams: new URLSearchParams({ rs: "pill" }),
       mapping: mapping({ rankingBadgeStyle: "colored" }),
-      configOverride: config({ rankingBadgeStyle: "bar" }),
       sd: { rankingBadgeStyle: "netflix" },
     }))
     expect(r.rankingBadgeStyle).toBe("pill")
   })
 
-  it("mapping rankingBadgeStyle 'default' is treated as no override (falls to config/sd)", () => {
+  it("mapping rankingBadgeStyle 'default' is treated as no override (falls to sd)", () => {
     const r = resolvePosterRenderConfig(baseInput({
       mapping: mapping({ rankingBadgeStyle: "default" }),
-      configOverride: config({ rankingBadgeStyle: "colored" }),
       sd: { rankingBadgeStyle: "bar" },
     }))
-    expect(r.rankingBadgeStyle).toBe("colored")
+    expect(r.rankingBadgeStyle).toBe("bar")
   })
 
   it("invalid query value does not leak to the renderer (falls back to default rendering)", () => {
-    // Fedele all'originale: la query invalida vince sul `||` e il renderer la
-    // trattava come default — con i tipi union il confine la converte a "shadow".
     const r = resolvePosterRenderConfig(baseInput({
       searchParams: new URLSearchParams({ bs: "garbage" }),
       sd: { badgeStyle: "vetro" },
@@ -139,31 +120,18 @@ describe("resolvePosterRenderConfig", () => {
     expect(r.blurHeight).toBe(5)
   })
 
-  it("non-finite numeric query falls back to config/default", () => {
+  it("non-finite numeric query falls back to mapping, then default", () => {
     const r = resolvePosterRenderConfig(baseInput({
       searchParams: new URLSearchParams({ blur: "abc", gradHeight: "1e999" }),
-      configOverride: config({ blurIntensity: 12, gradientHeight: 40 }),
+      mapping: mapping({ blurIntensity: 12 }),
     }))
     expect(r.blurIntensity).toBe(12)
-    expect(r.blurHeight).toBe(40)
+    expect(r.blurHeight).toBe(30)
   })
 
   it("badges=0 and ranking=0 disable badges (query mode)", () => {
     const r = resolvePosterRenderConfig(baseInput({
-      searchParams: new URLSearchParams({ badges: "0", ranking: "0" }),
-    }))
-    expect(r.badgesEnabled).toBe(false)
-    expect(r.rankingEnabled).toBe(false)
-  })
-
-  it("config token with ranking=0/other OFF flags disables them even with a configOverride", () => {
-    // Regressione: un link ?config= + ranking=0/badges=0 (hasQuery true perché
-    // c'è il config token) DEVE rispettare i flag OFF della query — prima
-    // senza poster=/mapping espliciti hasQuery era false e il server forzava
-    // badgesEnabled/rankingEnabled a true, mostrando il badge trend comunque.
-    const r = resolvePosterRenderConfig(baseInput({
       searchParams: new URLSearchParams({ badges: "0", ranking: "0", bg: "0", by: "0", br: "0", netLogo: "0" }),
-      configOverride: config({}),
     }))
     expect(r.badgesEnabled).toBe(false)
     expect(r.rankingEnabled).toBe(false)
@@ -173,39 +141,28 @@ describe("resolvePosterRenderConfig", () => {
     expect(r.qNetLogo).toBe("0")
   })
 
-  it("be=0 disables blur; blur defaults respect config token when set", () => {
-    const r = resolvePosterRenderConfig(baseInput({
-      searchParams: new URLSearchParams({ be: "0" }),
-    }))
-    expect(r.blurEnabled).toBe(false)
-    const r2 = resolvePosterRenderConfig(baseInput({
-      configOverride: config({ blurEnabled: false, networkLogo: false }),
-    }))
-    expect(r2.blurEnabled).toBe(false)
-    expect(r2.qNetLogo).toBe("0")
+  it("be=0 disables blur; mapping blurEnabled=false is respected", () => {
+    expect(resolvePosterRenderConfig(baseInput({ searchParams: new URLSearchParams({ be: "0" }) })).blurEnabled).toBe(false)
+    expect(resolvePosterRenderConfig(baseInput({ mapping: mapping({ blurEnabled: false }) })).blurEnabled).toBe(false)
   })
 
-  it("ribbonSide: query side=right or side=left wins, then mapping, then config token", () => {
+  it("ribbonSide: query side=right or side=left wins, then mapping", () => {
     expect(resolvePosterRenderConfig(baseInput({ searchParams: new URLSearchParams({ side: "right" }) })).ribbonSide).toBe("right")
     expect(resolvePosterRenderConfig(baseInput({ searchParams: new URLSearchParams({ side: "left" }), mapping: mapping({ ribbonSide: "right" }) })).ribbonSide).toBe("left")
-    expect(resolvePosterRenderConfig(baseInput({ searchParams: new URLSearchParams({ side: "left" }), configOverride: config({ ribbonSide: "right" }) })).ribbonSide).toBe("left")
     expect(resolvePosterRenderConfig(baseInput({ mapping: mapping({ ribbonSide: "right" }) })).ribbonSide).toBe("right")
-    expect(resolvePosterRenderConfig(baseInput({ configOverride: config({ ribbonSide: "right" }) })).ribbonSide).toBe("right")
     expect(resolvePosterRenderConfig(baseInput()).ribbonSide).toBe("left")
   })
 
-  it("networkLogo: query netLogo=1 or netLogo=0 wins, then mapping, then config token, then sd, then true", () => {
+  it("networkLogo: query netLogo wins, then mapping, then sd, then true", () => {
     expect(resolvePosterRenderConfig(baseInput({ searchParams: new URLSearchParams({ netLogo: "1" }), mapping: mapping({ networkLogo: false }) })).networkLogo).toBe(true)
     expect(resolvePosterRenderConfig(baseInput({ searchParams: new URLSearchParams({ netLogo: "0" }), mapping: mapping({ networkLogo: true }) })).networkLogo).toBe(false)
     expect(resolvePosterRenderConfig(baseInput({ mapping: mapping({ networkLogo: false }) })).networkLogo).toBe(false)
-    expect(resolvePosterRenderConfig(baseInput({ configOverride: config({ networkLogo: false }) })).networkLogo).toBe(false)
     expect(resolvePosterRenderConfig(baseInput({ sd: { networkLogo: false } })).networkLogo).toBe(false)
     expect(resolvePosterRenderConfig(baseInput()).networkLogo).toBe(true)
   })
 
-  it("queryExtra picks up extra param or config customBadge", () => {
+  it("queryExtra picks up the extra param", () => {
     expect(resolvePosterRenderConfig(baseInput({ searchParams: new URLSearchParams({ extra: "Oggi" }) })).queryExtra).toBe("Oggi")
-    expect(resolvePosterRenderConfig(baseInput({ configOverride: config({ customBadge: "Cult" }) })).queryExtra).toBe("Cult")
   })
 
   it("logo scale/offsets: query overrides mapping", () => {
@@ -222,6 +179,10 @@ describe("resolvePosterRenderConfig", () => {
     expect(r2.logoOffsetY).toBe(2)
   })
 
+  it("nologo=1 asks the renderer to skip the logo composite", () => {
+    expect(resolvePosterRenderConfig(baseInput({ searchParams: new URLSearchParams({ nologo: "1" }) })).omitLogo).toBe(true)
+  })
+
   it("badgeGenre/badgeYear/badgeRating default to true", () => {
     const r = resolvePosterRenderConfig(baseInput())
     expect(r.badgeGenre).toBe(true)
@@ -229,51 +190,59 @@ describe("resolvePosterRenderConfig", () => {
     expect(r.badgeRating).toBe(true)
   })
 
-  it("query bg/by/br=0 disables the component and wins over mapping/config", () => {
+  it("query bg/by/br=0 disables the component and wins over mapping", () => {
     const r = resolvePosterRenderConfig(baseInput({
       searchParams: new URLSearchParams({ bg: "0", by: "0", br: "0" }),
       mapping: mapping({ badgeGenre: true, badgeYear: true, badgeRating: true }),
-      configOverride: config({ badgeGenre: true, badgeYear: true, badgeRating: true }),
     }))
     expect(r.badgeGenre).toBe(false)
     expect(r.badgeYear).toBe(false)
     expect(r.badgeRating).toBe(false)
   })
 
-  it("mapping badgeGenre/badgeYear/badgeRating/manualQuality wins over config token", () => {
+  it("mapping badge components/manualQuality win over server defaults", () => {
     const r = resolvePosterRenderConfig(baseInput({
       mapping: mapping({ badgeGenre: false, badgeRating: false, manualQuality: "1080p" }),
-      configOverride: config({ badgeGenre: true, badgeRating: true, manualQuality: "4K" }),
+      sd: { badgeGenre: true, badgeYear: false, manualQuality: "SD" },
     }))
     expect(r.badgeGenre).toBe(false)
-    expect(r.badgeYear).toBe(true)
+    expect(r.badgeYear).toBe(false)
     expect(r.badgeRating).toBe(false)
     expect(r.manualQuality).toBe("1080p")
   })
 
-  it("config token badgeGenre/badgeYear/badgeRating/manualQuality wins over server defaults", () => {
-    const r = resolvePosterRenderConfig(baseInput({
-      configOverride: config({ badgeYear: false, manualQuality: "4K DV" }),
-      sd: { badgeYear: true, manualQuality: "SD" },
-    }))
-    expect(r.badgeYear).toBe(false)
-    expect(r.manualQuality).toBe("4K DV")
-    expect(r.badgeGenre).toBe(true)
-    expect(r.badgeRating).toBe(true)
-  })
-
   it("ratingSources default is ['imdb', 'tmdb'] and query rsrc overrides it", () => {
-    const rDef = resolvePosterRenderConfig(baseInput())
-    expect(rDef.ratingSources).toEqual(["imdb", "tmdb"])
-
+    expect(resolvePosterRenderConfig(baseInput()).ratingSources).toEqual(["imdb", "tmdb"])
     const rQuery = resolvePosterRenderConfig(baseInput({
       searchParams: new URLSearchParams({ rsrc: "imdb,tomatoes,metacritic" }),
     }))
     expect(rQuery.ratingSources).toEqual(["imdb", "tomatoes", "metacritic"])
+  })
+})
 
-    const rConfig = resolvePosterRenderConfig(baseInput({
-      configOverride: config({ ratingSources: ["letterboxd", "trakt"] }),
-    }))
-    expect(rConfig.ratingSources).toEqual(["letterboxd", "trakt"])
+describe("poster transform", () => {
+  it("query pscale/pox/poy beats the mapping, and values are clamped", () => {
+    const m = mapping({ posterScale: 150, posterOffsetX: 10, posterOffsetY: -20 })
+    expect(resolvePosterTransform(new URLSearchParams(), m)).toEqual({ posterScale: 150, posterOffsetX: 10, posterOffsetY: -20 })
+    expect(resolvePosterTransform(new URLSearchParams({ pscale: "200", pox: "-5", poy: "7" }), m))
+      .toEqual({ posterScale: 200, posterOffsetX: -5, posterOffsetY: 7 })
+    expect(resolvePosterTransform(new URLSearchParams({ pscale: "50" }), null).posterScale).toBe(100)
+    expect(resolvePosterTransform(new URLSearchParams({ pscale: "999" }), null).posterScale).toBe(300)
+    expect(resolvePosterTransform(new URLSearchParams({ pscale: "abc" }), null).posterScale).toBe(100)
+  })
+
+  it("crop window is centred, follows the pan, and never leaves the image", () => {
+    // 200% zoom of a 500×750 canvas → 1000×1500, centred window at (250, 375)
+    expect(posterCropWindow(500, 750, { posterScale: 200, posterOffsetX: 0, posterOffsetY: 0 }))
+      .toEqual({ scaledW: 1000, scaledH: 1500, left: 250, top: 375 })
+    // Dragging the poster right/down moves the window left/up
+    expect(posterCropWindow(500, 750, { posterScale: 200, posterOffsetX: 100, posterOffsetY: 50 }))
+      .toMatchObject({ left: 150, top: 325 })
+    // Clamped at the edges
+    expect(posterCropWindow(500, 750, { posterScale: 200, posterOffsetX: 9999, posterOffsetY: -9999 }))
+      .toMatchObject({ left: 0, top: 750 })
+    // No zoom → no room to pan
+    expect(posterCropWindow(500, 750, { posterScale: 100, posterOffsetX: 80, posterOffsetY: 80 }))
+      .toEqual({ scaledW: 500, scaledH: 750, left: 0, top: 0 })
   })
 })

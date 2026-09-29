@@ -77,6 +77,8 @@ export interface GenerationInput {
   logoScale: number | null
   logoOffsetX: number | null
   logoOffsetY: number | null
+  /** Non comporre il logo (la preview dell'editor lo disegna lato client). */
+  omitLogo?: boolean
 
   // Badge data sources
   mediaType: "movie" | "tv"
@@ -427,7 +429,7 @@ export async function generatePosterBuffer(input: GenerationInput): Promise<Buff
     badgesEnabled, rankingEnabled, genreName, voteAverage, badgeStyle,
     rankingBadgeStyle, badgeGenre, badgeYear, badgeRating, manualQuality, badgeFormat,
     topLight, targetCenter, ribbonSide,
-    logoScale, logoOffsetX, logoOffsetY,
+    logoScale, logoOffsetX, logoOffsetY, omitLogo,
     mediaType, finalRank, animeRankResult,
     mapping, tmdbNetworks, productionCompanies, tmdbStudios,
     tmdbNetworksDetailed, productionCompaniesDetailed,
@@ -505,7 +507,9 @@ export async function generatePosterBuffer(input: GenerationInput): Promise<Buff
   // -----------------------------------------------------------------------
   const vigBuf = await getVignette()
   composites.push({ input: vigBuf, top: 0, left: 0 })
-  if (logoResult) composites.push(logoResult)
+  // omitLogo: la preview dell'editor disegna il logo lato client (trascinamento
+  // fluido); colori badge e posizione del logo network lo considerano comunque.
+  if (logoResult && !omitLogo) composites.push(logoResult)
 
   // -----------------------------------------------------------------------
   // 4. Badge computation

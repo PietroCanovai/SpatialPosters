@@ -1,9 +1,7 @@
 "use client"
 
 import React, { useEffect, useState, useCallback } from "react"
-import Link from "next/link"
 import {
-  ArrowLeft,
   RefreshCw,
   Activity,
   CheckCircle2,
@@ -14,13 +12,13 @@ import {
   Zap,
   Tv,
 } from "lucide-react"
-import { PictoriumRoot, usePSelector } from "@/lib/context"
+import { PictoriumRoot } from "@/lib/context"
 import { ToastProvider } from "@/components/Toast"
 import { AmbientBackground } from "@/components/AmbientBackground"
 import { useT } from "@/lib/contexts/TranslationContext"
 import { setLang, getLang } from "@/lib/i18n"
 import { DesktopSidebar } from "@/components/DesktopSidebar"
-import { MobileDock } from "@/components/MobileDock"
+import { BackButton } from "@/components/BackButton"
 
 interface CheckResult {
   ok: boolean
@@ -183,13 +181,7 @@ function StatusContent() {
         <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 md:pt-14 lg:pt-16 pb-24 md:pb-8 md:pl-20">
           {/* Top Bar */}
           <div className="flex items-center justify-between mb-6">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-zinc-300 hover:text-white transition-colors bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 px-3.5 py-2 rounded-xl cursor-pointer shadow-sm active:scale-95"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>{t("ui.back") || "Torna alla Home"}</span>
-            </Link>
+            <BackButton />
 
             <button
               type="button"
@@ -489,7 +481,6 @@ function StatusContent() {
           </div>
         </div>
       </ToastProvider>
-      <MobileDock />
     </div>
   )
 }

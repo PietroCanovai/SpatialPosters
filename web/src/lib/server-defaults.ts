@@ -30,19 +30,11 @@ export interface ServerDefaults {
   defaultLogoFitEnabled?: boolean
   networkLogo?: boolean
   ribbonSide?: "left" | "right"
-  episodeMetadataSource?: "tmdb" | "tvdb"
   /** Regione classifiche JustWatch/FlixPatrol + lingua titoli (codice JW, es. "IT"). */
   region?: string
-  customCatalogs?: import("@/lib/types").CustomCatalogConfig[]
-  disabledCatalogIds?: string[]
-  homeDisabledCatalogIds?: string[]
-  catalogOrder?: string[]
-  catalogRenames?: Record<string, string>
 }
 
 const FILE = path.join(DATA_DIR, "defaults.json")
-const useKv = !!process.env.KV_REST_API_URL && !!process.env.KV_REST_API_TOKEN
-const KV_KEY = "defaults"
 
 // ── Default di stile da env d'istanza (PICTORIUM_*, con fallback alle legacy POSTERIUM_*) ─────────────────────────
 // Per istanze personali (es. Vercel senza KV): fissano il default di resa
@@ -98,8 +90,6 @@ function defaultsFromEnv(): ServerDefaults {
   const blurF = envNum("BLUR_FADE")
   const blurD = envNum("BLUR_DARKNESS")
   const gradH = envNum("GRADIENT_HEIGHT")
-  const epSrc = getEnv("EPISODE_METADATA_SOURCE")?.trim().toLowerCase()
-  if (epSrc === "tmdb" || epSrc === "tvdb") d.episodeMetadataSource = epSrc
   // Regione classifiche: codice canonico, fail-closed su IT se non riconosciuta.
   const regionRaw = getEnv("REGION")?.trim()
   if (regionRaw) d.region = normalizeRegion(regionRaw)
@@ -137,22 +127,11 @@ async function loadFromDisk(): Promise<ServerDefaults> {
   }
 }
 
-async function kvLoadDefaults(): Promise<ServerDefaults> {
-  try {
-    const { kv } = await import("@vercel/kv")
-    const raw = await kv.get<ServerDefaults>(KV_KEY)
-    return raw ?? {}
-  } catch (error) {
-    logDefaultsError("failed to load defaults (KV)", error)
-    return {}
-  }
-}
-
 /** Carica i defaults in cache (una sola volta per cold start). */
 function warmDefaults(): Promise<void> {
   if (warmPromise) return warmPromise
   warmPromise = (async () => {
-    const d = useKv ? await kvLoadDefaults() : await loadFromDisk()
+    const d = await loadFromDisk()
     cached = d
   })().catch(() => {})
   return warmPromise
@@ -160,37 +139,24 @@ function warmDefaults(): Promise<void> {
 
 export function getServerDefaults(): ServerDefaults {
   // Il risultato fonde gli ENV_DEFAULTS (default d'istanza, opt-in) con i
-  // defaults salvati (file/KV): il salvato vince sull'env. Non mutiamo `cached`
+  // defaults salvati (file): il salvato vince sull'env. Non mutiamo `cached`
   // così setServerDefaults scrive solo i valori dell'utente e l'env continua a
   // coprire solo i campi NON salvati.
   if (cached) return { ...ENV_DEFAULTS, ...cached }
   let loaded: ServerDefaults | null = null
-  if (!useKv) {
-    try {
-      if (existsSync(FILE)) {
-        const raw = readFileSync(FILE, "utf-8")
-        loaded = JSON.parse(raw) as ServerDefaults
-      }
-    } catch (error) {
-      logDefaultsError("failed to load defaults (cold start)", error)
+  try {
+    if (existsSync(FILE)) {
+      const raw = readFileSync(FILE, "utf-8")
+      loaded = JSON.parse(raw) as ServerDefaults
     }
+  } catch (error) {
+    logDefaultsError("failed to load defaults (cold start)", error)
   }
   cached = loaded ?? {}
   warmDefaults()
   return { ...ENV_DEFAULTS, ...cached }
 }
 export async function setServerDefaults(d: ServerDefaults): Promise<void> {
-  if (useKv) {
-    try {
-      const { kv } = await import("@vercel/kv")
-      await kv.set(KV_KEY, d)
-      cached = { ...d }
-    } catch (error) {
-      logDefaultsError("failed to write defaults (KV)", error)
-      throw error
-    }
-    return
-  }
   const existing = writeQueue
   writeQueue = (async () => {
     await existing

@@ -14,6 +14,9 @@ export function usePosterPreview() {
   const [previewLoading, setPreviewLoading] = useState(false)
   const [loadProgress, setLoadProgress] = useState(0)
   const [imgSrc, setImgSrc] = useState("")
+  // URL da cui proviene l'immagine mostrata: la preview live confronta la
+  // trasformazione di quel render con quella corrente dell'editor.
+  const [loadedUrl, setLoadedUrl] = useState("")
   // Bump per far ripartire la fetch: il Retry del preview non può dipendere
   // solo da previewUrl (invariato dopo un errore), serve un nonce.
   const [retryNonce, setRetryNonce] = useState(0)
@@ -36,6 +39,7 @@ export function usePosterPreview() {
         prevObjUrlRef.current = ""
       }
       setImgSrc("")
+      setLoadedUrl("")
       setPreviewLoading(false)
       return
     }
@@ -71,6 +75,7 @@ export function usePosterPreview() {
         if (prevObjUrlRef.current) URL.revokeObjectURL(prevObjUrlRef.current)
         prevObjUrlRef.current = objUrl
         setImgSrc(objUrl)
+        setLoadedUrl(url)
         setLoadProgress(100)
         setPreviewLoading(false)
       } else {
@@ -124,6 +129,7 @@ export function usePosterPreview() {
     previewLoading,
     loadProgress,
     imgSrc,
+    loadedUrl,
     retry,
   }
 }

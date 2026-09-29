@@ -115,6 +115,13 @@ export interface PosterEditorCtx {
   setLogoOffsetY: (v: number | ((prev: number) => number)) => void
   logoDisabled: boolean
   setLogoDisabled: (v: boolean | ((prev: boolean) => boolean)) => void
+  // ---- Poster transform (zoom % / pan px del canvas 500×750) ----
+  posterScale: number
+  setPosterScale: (v: number | ((prev: number) => number)) => void
+  posterOffsetX: number
+  setPosterOffsetX: (v: number | ((prev: number) => number)) => void
+  posterOffsetY: number
+  setPosterOffsetY: (v: number | ((prev: number) => number)) => void
   // ---- Backdrop ----
   backdrops: TMDBImage[]
   setBackdrops: (v: TMDBImage[] | ((prev: TMDBImage[]) => TMDBImage[])) => void
@@ -166,6 +173,11 @@ export function PosterEditorProvider({
   const [logoOffsetX, setLogoOffsetX] = useState(0)
   const [logoOffsetY, setLogoOffsetY] = useState(0)
   const [logoDisabled, setLogoDisabled] = useState(false)
+
+  // ---- Poster transform state ----
+  const [posterScale, setPosterScale] = useState(100)
+  const [posterOffsetX, setPosterOffsetX] = useState(0)
+  const [posterOffsetY, setPosterOffsetY] = useState(0)
 
   // ---- Backdrop state ----
   const [backdrops, setBackdrops] = useState<TMDBImage[]>([])
@@ -509,6 +521,14 @@ export function PosterEditorProvider({
       logoDisabled,
       setLogoDisabled,
 
+      // Poster transform
+      posterScale,
+      setPosterScale,
+      posterOffsetX,
+      setPosterOffsetX,
+      posterOffsetY,
+      setPosterOffsetY,
+
       // Backdrop
       backdrops,
       setBackdrops,
@@ -590,6 +610,11 @@ export function PosterEditorProvider({
       logoOffsetX, setLogoOffsetX,
       logoOffsetY, setLogoOffsetY,
       logoDisabled, setLogoDisabled,
+
+      // Poster transform
+      posterScale, setPosterScale,
+      posterOffsetX, setPosterOffsetX,
+      posterOffsetY, setPosterOffsetY,
 
       // Backdrop
       backdrops, setBackdrops,

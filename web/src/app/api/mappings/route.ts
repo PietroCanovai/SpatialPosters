@@ -1,18 +1,10 @@
 import { NextRequest } from "next/server"
-import { getAll, getById, upsert, removeAll } from "@/lib/store"
+import { getAll, upsert, removeAll } from "@/lib/store"
 import { rateLimit, rateLimitKey, rateLimitResponse } from "@/lib/rate-limit"
-import { cacheInvalidate, cacheInvalidatePosterData, cacheInvalidatePosterDataFor } from "@/lib/cache"
-import { bumpCatalogEpoch } from "@/lib/catalog-epoch"
+import { cacheInvalidatePosterData, cacheInvalidatePosterDataFor } from "@/lib/cache"
 import { mappingSchema } from "@/lib/validation"
 import { checkAdminToken, requireAdminToken, isSameOrigin, adminAuthResponse, originMismatchResponse } from "@/lib/auth"
-import { getWarmupCatalogs } from "@/lib/catalog-definitions"
-import { getServerDefaults } from "@/lib/server-defaults"
-import { buildStremioPosterUrl } from "@/lib/stremio-poster-url"
-import { resolveRequestApiKey } from "@/lib/tmdb"
-import { createLogger } from "@/lib/logger"
 import { readJsonBody, BodyTooLargeError, DEFAULT_MAX_BODY_BYTES } from "@/lib/read-body"
-
-const log = createLogger("mappings")
 
 export async function GET(req: NextRequest) {
   const rl = await rateLimit(rateLimitKey(req), "mappings")
@@ -73,49 +65,6 @@ export async function POST(req: NextRequest) {
   // Invalidazione mirata al mapping salvato, non globale (i default impattano
   // tutto, un singolo mapping solo il suo poster/badge).
   cacheInvalidatePosterDataFor(parsed.data.mediaType, parsed.data.tmdbId)
-  // Bump epoch cataloghi (F3): invalida cross-instance — la cacheInvalidate
-  // sopra non raggiunge le altre istanze serverless.
-  await bumpCatalogEpoch()
-  // Il meta videos (Stremio) dipende da episodeGroupId: invalidare anche i
-  // meta cache (tags stremio/meta) altrimenti dopo un cambio ordinamento
-  // si serve lo stale 12h e l'utente vede ancora le stagioni vecchie.
-  cacheInvalidate("stremio")
-  // Warm poster cache — impopola cache TMDB + poster prima che Stremio/utenti richiedano.
-  // Guardia VERCEL (fix M11): il self-fetch su 127.0.0.1 non esiste su Vercel
-  // serverless; prima il warmup falliva sempre e loggava warning ingannevoli.
-  if (!process.env.VERCEL) {
-    const internalOrigin = `http://127.0.0.1:${process.env.PORT || "3000"}`
-    void (async () => {
-      const savedMapping = await getById(parsed.data.mediaType, parsed.data.tmdbId)
-      const warmUrl = buildStremioPosterUrl({
-        origin: internalOrigin,
-        type: parsed.data.mediaType === "tv" ? "series" : "movie",
-        id: parsed.data.tmdbId,
-        defaults: getServerDefaults(),
-        mapping: savedMapping,
-        lang: parsed.data.language || "it",
-      })
-      await fetch(warmUrl, { signal: AbortSignal.timeout(25000) })
-    })().catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error)
-      log.warn("Poster warmup failed", { error: message })
-    })
-    // Warm catalog cache — ricostruisci cataloghi principali in background.
-    // Fix M11: la chiave TMDB della richiesta viene inoltrata — senza, i
-    // cataloghi keyed (JW) venivano cachati vuoti per 60s sotto la cache
-    // key `aknone` che nessuna richiesta reale riusa. La chiave viaggia
-    // nell'header x-api-key (policy di tmdb.ts) e non nella query string,
-    // anche se il self-fetch è su loopback: così l'URL resta pulito nei log.
-    const requestApiKey = resolveRequestApiKey(req)
-    const warmHeaders: HeadersInit | undefined = requestApiKey ? { "x-api-key": requestApiKey } : undefined
-    for (const catalog of getWarmupCatalogs()) {
-      const catalogUrl = `${internalOrigin}/catalog/${catalog.type}/${catalog.id}.json`
-      void fetch(catalogUrl, { signal: AbortSignal.timeout(15000), headers: warmHeaders }).catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : String(error)
-        log.warn("Catalog warmup failed", { catalog: catalog.id, error: message })
-      })
-    }
-  }
   return Response.json({ ok: true })
 }
 
@@ -128,6 +77,5 @@ export async function DELETE(req: NextRequest) {
   if (!isSameOrigin(req)) return originMismatchResponse()
   await removeAll()
   cacheInvalidatePosterData()
-  await bumpCatalogEpoch()
   return Response.json({ ok: true })
 }

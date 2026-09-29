@@ -1,11 +1,15 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import { useState, useCallback, useRef } from "react"
 import type { SearchResult, TMDBImage } from "./types"
-import { pushView, replaceView, goBack, type View } from "./router"
 
+/**
+ * Stato della selezione nell'editor. La navigazione tra schermate è fatta
+ * solo con route Next vere (/, /search, /myposters, /movie/[id], /tv/[id], …):
+ * niente più "view" interne con history.pushState manuale, che facevano
+ * divergere la cronologia del browser dal router (Indietro imprevedibile).
+ */
 export function useNavigation() {
-  const [view, setViewState] = useState<View>("edit")
   const [selected, setSelected] = useState<SearchResult | null>(null)
   const [previewPoster, setPreviewPoster] = useState<TMDBImage | null>(null)
   const [selectedLogo, setSelectedLogo] = useState<TMDBImage | null>(null)
@@ -14,96 +18,21 @@ export function useNavigation() {
   const [logos, setLogos] = useState<TMDBImage[]>([])
   const fetchIdRef = useRef(0)
 
-  const [sourceView, setSourceView] = useState<View | null>(null)
-
-  const setView = useCallback((v: View) => {
-    setViewState(v)
-  }, [])
-
-  // Router centralizzato: gestisce history + stato view insieme.
-  const router = useMemo(() => ({
-    push: (v: View) => { pushView(v); setViewState(v) },
-    replace: (v: View) => { replaceView(v); setViewState(v) },
-    back: () => { goBack() },
-  }), [])
-
   const resetState = useCallback(() => {
     ++fetchIdRef.current
-    setViewState("edit")
     setSelected(null)
     setPreviewPoster(null)
     setSelectedLogo(null)
     setPreviewId(null)
     setPosters([])
     setLogos([])
-    setSourceView(null)
   }, [])
 
   const incrementFetchId = useCallback(() => {
     return ++fetchIdRef.current
   }, [])
 
-  const navigateToPoster = useCallback((item: SearchResult, _source?: string) => {
-    const src = (_source as View) || view || "edit"
-    setSourceView(src)
-    replaceView(src)
-    pushView("edit", { source: src, item })
-  }, [view])
-
-  const goHome = useCallback(() => {
-    setViewState("edit")
-    setSelected(null)
-    setPreviewPoster(null)
-    setSelectedLogo(null)
-    setPreviewId(null)
-    setPosters([])
-    setSourceView(null)
-  }, [])
-
-  useEffect(() => {
-    const handler = (e: PopStateEvent) => {
-      incrementFetchId()
-      const source = e.state?.source
-      const targetView = e.state?.view || source
-
-      if (targetView === "cataloghi" || source === "cataloghi") {
-        setViewState("cataloghi")
-        setSelected(null)
-        setPreviewPoster(null)
-        setSelectedLogo(null)
-        setPreviewId(null)
-      } else if (targetView === "myposters" || source === "myposters") {
-        setViewState("myposters")
-        setSelected(null)
-        setPreviewPoster(null)
-        setSelectedLogo(null)
-        setPreviewId(null)
-      } else if (targetView === "search" || source === "search") {
-        setViewState("search")
-        setSelected(null)
-        setPreviewPoster(null)
-        setSelectedLogo(null)
-        setPreviewId(null)
-      } else if (targetView === "edit") {
-        setViewState("edit")
-        if (!e.state?.selected) {
-          setSelected(null)
-          setPreviewPoster(null)
-          setSelectedLogo(null)
-          setPreviewId(null)
-        }
-      } else {
-        resetState()
-      }
-    }
-    addEventListener("popstate", handler)
-    return () => removeEventListener("popstate", handler)
-  }, [resetState, incrementFetchId])
-
   return {
-    view, setView,
-    router,
-    sourceView, setSourceView,
     selected, setSelected,
     previewPoster, setPreviewPoster,
     selectedLogo, setSelectedLogo,
@@ -112,8 +41,27 @@ export function useNavigation() {
     logos, setLogos,
     fetchIdRef,
     incrementFetchId,
-    navigateToPoster,
-    goHome,
     resetState,
   }
+}
+
+/** Titolo/anno/poster del risultato cliccato, per mostrarli subito nell'editor. */
+const SUMMARY_KEY = "spatialposters:item:"
+
+export function rememberItemSummary(item: SearchResult): void {
+  try { sessionStorage.setItem(`${SUMMARY_KEY}${item.media_type}:${item.id}`, JSON.stringify(item)) } catch {}
+}
+
+export function recallItemSummary(mediaType: string, id: number): SearchResult | null {
+  try {
+    const raw = sessionStorage.getItem(`${SUMMARY_KEY}${mediaType}:${id}`)
+    return raw ? (JSON.parse(raw) as SearchResult) : null
+  } catch {
+    return null
+  }
+}
+
+/** URL dell'editor per un titolo. */
+export function editorHref(item: { id: number; media_type: string }): string {
+  return `/${item.media_type === "tv" ? "tv" : "movie"}/${item.id}`
 }

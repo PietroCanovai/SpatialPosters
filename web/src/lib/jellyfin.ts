@@ -172,6 +172,48 @@ export async function getItem(cfg: JellyfinConfig, itemId: string): Promise<Jell
   return toJellyfinItem(raw)
 }
 
+// Indice TMDB → item per libreria, per trovare l'item quando si invia
+// dall'editor (che conosce solo il TMDB id). Scade dopo 5 minuti.
+let tmdbIndex: { url: string; at: number; items: JellyfinItem[] } | null = null
+const TMDB_INDEX_TTL_MS = 5 * 60 * 1000
+
+async function allItems(cfg: JellyfinConfig): Promise<JellyfinItem[]> {
+  if (tmdbIndex && tmdbIndex.url === cfg.url && Date.now() - tmdbIndex.at < TMDB_INDEX_TTL_MS) return tmdbIndex.items
+  const items: JellyfinItem[] = []
+  for (let start = 0; ; start += 500) {
+    const page = await listItems(cfg, { start, limit: 500 })
+    items.push(...page.items)
+    if (page.items.length < 500 || items.length >= page.total) break
+  }
+  tmdbIndex = { url: cfg.url, at: Date.now(), items }
+  return items
+}
+
+/** Item della libreria Jellyfin con questo TMDB id (può essere più di uno, es. edizioni diverse). */
+export async function findItemsByTmdb(cfg: JellyfinConfig, type: "movie" | "tv", tmdbId: number): Promise<JellyfinItem[]> {
+  const q = new URLSearchParams({
+    Recursive: "true",
+    IncludeItemTypes: type === "tv" ? "Series" : "Movie",
+    AnyProviderIdEquals: `Tmdb.${tmdbId}`,
+    Fields: "ProviderIds,ProductionYear",
+    EnableImageTypes: "Primary",
+  })
+  try {
+    const res = await jellyfinJson<{ Items?: RawItem[] }>(cfg, `/Items?${q}`)
+    // Il filtro lato server non è garantito su tutte le versioni: verifica sempre.
+    const hits = (res.Items || []).map(toJellyfinItem).filter((i) => i.tmdbId === tmdbId && i.type === type)
+    if (hits.length) return hits
+  } catch (e) {
+    if (e instanceof JellyfinError && e.status === 401) throw e
+  }
+  return (await allItems(cfg)).filter((i) => i.tmdbId === tmdbId && i.type === type)
+}
+
+/** Invalida l'indice TMDB (es. dopo aver cambiato server). */
+export function clearTmdbIndex(): void {
+  tmdbIndex = null
+}
+
 /** Jellyfin vuole il corpo dell'upload immagine codificato in base64. */
 export async function uploadPrimaryImage(cfg: JellyfinConfig, itemId: string, image: Buffer, contentType: string): Promise<void> {
   await jellyfinFetch(cfg, `/Items/${encodeURIComponent(itemId)}/Images/Primary`, {
