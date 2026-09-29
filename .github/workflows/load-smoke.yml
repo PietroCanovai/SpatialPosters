@@ -8,6 +8,10 @@ on:
     - cron: "0 4 * * 3" # mercoledì 04:00 UTC (diverso dall'audit del lunedì)
   workflow_dispatch:
 
+defaults:
+  run:
+    working-directory: web
+
 jobs:
   load-smoke:
     runs-on: ubuntu-latest
@@ -18,6 +22,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: web/package-lock.json
       - run: npm ci
       # Il caricamento di default (40 richieste, concorrenza 10) è sufficiente
       # per esercitare slot limiter, backpressure 503 e deadline.

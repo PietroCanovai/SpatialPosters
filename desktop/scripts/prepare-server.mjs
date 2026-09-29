@@ -9,7 +9,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const root = path.resolve(here, "..", "..")
+const root = path.resolve(here, "..", "..", "web")
 const out = path.resolve(here, "..", "server")
 
 function run(cmd, args) {
@@ -39,7 +39,10 @@ if (!fs.existsSync(path.join(standalone, "server.js"))) {
 }
 
 fs.rmSync(out, { recursive: true, force: true })
-fs.cpSync(standalone, out, { recursive: true })
+// dereference: Next links Turbopack's hashed externals (.next/node_modules/
+// sharp-<hash>) to the project's node_modules with junctions/symlinks, which
+// would point outside the bundle once packaged.
+fs.cpSync(standalone, out, { recursive: true, dereference: true })
 fs.cpSync(path.join(root, ".next", "static"), path.join(out, ".next", "static"), { recursive: true })
 fs.cpSync(path.join(root, "public"), path.join(out, "public"), { recursive: true })
 fs.cpSync(path.join(root, "src", "assets", "fonts"), path.join(out, "src", "assets", "fonts"), { recursive: true })

@@ -1,25 +1,23 @@
 // SpatialPosters desktop shell.
 //
-// Runs the Next.js standalone server in an Electron utility process and shows
-// it in a window. The server keeps running in the tray when the window is
-// closed, so Stremio/Jellyfin can keep fetching posters.
+// Runs the SpatialPosters Next.js server in an Electron utility process while
+// the window is open. Posters are rendered and uploaded into Jellyfin (see the
+// Jellyfin page), so nothing needs to keep running after you close the app.
 //
-// Admin routes (mappings, defaults, cache, …) require a token. A random one is
-// generated on first run and injected only into requests coming from this
-// app's own window, so other devices on the LAN can read posters/catalogs but
-// can't change your settings.
+// Admin routes (mappings, defaults, Jellyfin, …) require a token. A random one
+// is generated on first run and injected only into requests coming from this
+// app's own window.
 const {
-  app, BrowserWindow, Menu, Notification, Tray, dialog, nativeImage, session, shell, utilityProcess,
+  app, BrowserWindow, Menu, dialog, session, shell, utilityProcess,
 } = require("electron")
 const crypto = require("node:crypto")
 const fs = require("node:fs")
 const http = require("node:http")
 const net = require("node:net")
-const os = require("node:os")
 const path = require("node:path")
 
 const APP_NAME = "SpatialPosters"
-const DEFAULT_SETTINGS = { port: 7272, lanAccess: false, redditPosters: false }
+const DEFAULT_SETTINGS = { port: 7272, redditPosters: false }
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()
@@ -32,16 +30,10 @@ const dataDir = path.join(userData, "data")
 const logDir = path.join(userData, "logs")
 const settingsFile = path.join(userData, "settings.json")
 const secretsFile = path.join(userData, "secrets.json")
-const startHidden = process.argv.includes("--hidden")
 
-let settings = loadSettings()
-const secrets = loadSecrets()
 let server = null
-let serverLog = null
 let win = null
-let tray = null
 let quitting = false
-let trayHintShown = false
 
 // ---------------------------------------------------------------------------
 // Persistence
@@ -58,14 +50,11 @@ function writeJson(file, value) {
 }
 
 function loadSettings() {
-  const saved = readJson(settingsFile) || {}
-  const merged = { ...DEFAULT_SETTINGS, ...saved }
+  const merged = { ...DEFAULT_SETTINGS, ...(readJson(settingsFile) || {}) }
   if (!Number.isInteger(merged.port) || merged.port < 1024 || merged.port > 65535) merged.port = DEFAULT_SETTINGS.port
+  // Write back so the file exists and documents every option.
+  writeJson(settingsFile, merged)
   return merged
-}
-
-function saveSettings() {
-  writeJson(settingsFile, settings)
 }
 
 function loadSecrets() {
@@ -78,45 +67,27 @@ function loadSecrets() {
   return next
 }
 
+const settings = loadSettings()
+const secrets = loadSecrets()
+const origin = `http://127.0.0.1:${settings.port}`
+
 // ---------------------------------------------------------------------------
-// Networking helpers
+// Server process
 
-/** Best-guess LAN IPv4, skipping virtual adapters (Hyper-V, WSL, VPNs, VMs). */
-function lanAddress() {
-  const skip = /vethernet|virtualbox|vmware|wsl|hyper-v|loopback|tailscale|zerotier|docker/i
-  const candidates = []
-  for (const [name, addrs] of Object.entries(os.networkInterfaces())) {
-    if (skip.test(name)) continue
-    for (const a of addrs || []) {
-      if (a.family === "IPv4" && !a.internal) candidates.push(a.address)
-    }
-  }
-  const rank = (ip) => (ip.startsWith("192.168.") ? 0 : ip.startsWith("10.") ? 1 : /^172\.(1[6-9]|2\d|3[01])\./.test(ip) ? 2 : 3)
-  return candidates.sort((a, b) => rank(a) - rank(b))[0] || null
-}
-
-function appHost() {
-  return settings.lanAccess ? (lanAddress() || "127.0.0.1") : "127.0.0.1"
-}
-
-function appOrigin() {
-  return `http://${appHost()}:${settings.port}`
-}
-
-function portIsFree(port, host) {
+function portIsFree(port) {
   return new Promise((resolve) => {
     const srv = net.createServer()
     srv.once("error", () => resolve(false))
     srv.once("listening", () => srv.close(() => resolve(true)))
-    srv.listen(port, host)
+    srv.listen(port, "127.0.0.1")
   })
 }
 
-function waitForServer(port, timeoutMs) {
+function waitForServer(timeoutMs) {
   const deadline = Date.now() + timeoutMs
   return new Promise((resolve, reject) => {
     const attempt = () => {
-      const req = http.get({ host: "127.0.0.1", port, path: "/api/live", timeout: 2000 }, (res) => {
+      const req = http.get(`${origin}/api/live`, { timeout: 2000 }, (res) => {
         res.resume()
         if (res.statusCode === 200) return resolve()
         retry()
@@ -125,16 +96,13 @@ function waitForServer(port, timeoutMs) {
       req.on("timeout", () => { req.destroy(); retry() })
     }
     const retry = () => {
-      if (!server) return reject(new Error("Server process exited during startup"))
-      if (Date.now() > deadline) return reject(new Error("Server did not start in time"))
-      setTimeout(attempt, 300)
+      if (!server) return reject(new Error("The poster server stopped during startup."))
+      if (Date.now() > deadline) return reject(new Error("The poster server did not start in time."))
+      setTimeout(attempt, 250)
     }
     attempt()
   })
 }
-
-// ---------------------------------------------------------------------------
-// Server process
 
 function serverDir() {
   return app.isPackaged ? path.join(process.resourcesPath, "server") : path.join(__dirname, "server")
@@ -153,15 +121,13 @@ async function startServer() {
   if (!fs.existsSync(entry)) {
     throw new Error(`Server bundle not found at ${entry}.\nRun "npm run prepare-server" in the desktop folder first.`)
   }
-  const bindHost = settings.lanAccess ? "0.0.0.0" : "127.0.0.1"
-  if (!(await portIsFree(settings.port, bindHost))) {
-    throw new Error(`Port ${settings.port} is already in use.\nChange "port" in ${settingsFile} and restart.`)
+  if (!(await portIsFree(settings.port))) {
+    throw new Error(`Port ${settings.port} is already in use (is ${APP_NAME} already open?).\nYou can change "port" in:\n${settingsFile}`)
   }
 
   fs.mkdirSync(dataDir, { recursive: true })
-  serverLog = openServerLog()
-
-  server = utilityProcess.fork(entry, [], {
+  const log = openServerLog()
+  const child = utilityProcess.fork(entry, [], {
     cwd: dir,
     serviceName: `${APP_NAME} server`,
     stdio: "pipe",
@@ -169,7 +135,7 @@ async function startServer() {
       ...process.env,
       NODE_ENV: "production",
       PORT: String(settings.port),
-      HOSTNAME: bindHost,
+      HOSTNAME: "127.0.0.1",
       NEXT_TELEMETRY_DISABLED: "1",
       SPATIALPOSTERS_DATA_DIR: dataDir,
       SPATIALPOSTERS_ADMIN_TOKEN: secrets.adminToken,
@@ -178,20 +144,20 @@ async function startServer() {
       SPATIALPOSTERS_LOG_FORMAT: "human",
     },
   })
-  const log = serverLog
-  server.stdout?.on("data", (d) => log.write(d))
-  server.stderr?.on("data", (d) => log.write(d))
-  const child = server
-  server.once("exit", (code) => {
+  server = child
+  child.stdout?.on("data", (d) => log.write(d))
+  child.stderr?.on("data", (d) => log.write(d))
+  child.once("exit", (code) => {
     log.end(`\n[desktop] server exited with code ${code}\n`)
     if (server !== child) return
     server = null
     if (!quitting) {
-      dialog.showErrorBox(APP_NAME, `The poster server stopped unexpectedly (code ${code}).\nSee ${path.join(logDir, "server.log")}`)
+      dialog.showErrorBox(APP_NAME, `The poster server stopped unexpectedly (code ${code}).\nLog: ${path.join(logDir, "server.log")}`)
+      app.quit()
     }
   })
 
-  await waitForServer(settings.port, 60_000)
+  await waitForServer(60_000)
 }
 
 function stopServer() {
@@ -205,44 +171,16 @@ function stopServer() {
   })
 }
 
-async function restartServer() {
-  await stopServer()
-  try {
-    await startServer()
-    installAdminHeader()
-    if (win) win.loadURL(appOrigin())
-  } catch (err) {
-    dialog.showErrorBox(APP_NAME, String(err instanceof Error ? err.message : err))
-  }
-  rebuildTrayMenu()
-}
-
-// Only requests from this app's own window carry the admin token.
-function installAdminHeader() {
-  const urls = [`http://127.0.0.1:${settings.port}/*`]
-  const lan = lanAddress()
-  if (lan) urls.push(`http://${lan}:${settings.port}/*`)
-  session.defaultSession.webRequest.onBeforeSendHeaders({ urls }, (details, callback) => {
-    details.requestHeaders["x-admin-token"] = secrets.adminToken
-    callback({ requestHeaders: details.requestHeaders })
-  })
-}
-
 // ---------------------------------------------------------------------------
 // Window
 
 function isAppUrl(url) {
-  try {
-    const u = new URL(url)
-    return u.protocol === "http:" && String(u.port) === String(settings.port) &&
-      (u.hostname === "127.0.0.1" || u.hostname === "localhost" || u.hostname === lanAddress())
-  } catch { return false }
+  try { return new URL(url).origin === origin } catch { return false }
 }
 
 function openExternalSafe(url) {
   try {
-    const { protocol } = new URL(url)
-    if (["https:", "http:", "stremio:", "mailto:"].includes(protocol)) shell.openExternal(url)
+    if (["https:", "http:", "stremio:"].includes(new URL(url).protocol)) shell.openExternal(url)
   } catch { /* ignore malformed */ }
 }
 
@@ -265,8 +203,6 @@ function createWindow() {
       spellcheck: false,
     },
   })
-  win.setMenuBarVisibility(false)
-
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (isAppUrl(url)) return { action: "allow" }
     openExternalSafe(url)
@@ -278,87 +214,20 @@ function createWindow() {
       openExternalSafe(url)
     }
   })
-
-  win.on("close", (event) => {
-    if (quitting) return
-    event.preventDefault()
-    win.hide()
-    if (!trayHintShown && Notification.isSupported()) {
-      trayHintShown = true
-      new Notification({ title: APP_NAME, body: "Still running in the tray so your posters keep working." }).show()
-    }
-  })
-  win.once("ready-to-show", () => { if (!startHidden) win.show() })
-  win.loadURL(appOrigin())
-}
-
-function showWindow() {
-  if (!win) return createWindow()
-  if (win.isMinimized()) win.restore()
-  win.show()
-  win.focus()
-}
-
-// ---------------------------------------------------------------------------
-// Tray
-
-function rebuildTrayMenu() {
-  if (!tray) return
-  const lan = lanAddress()
-  const local = `http://127.0.0.1:${settings.port}`
-  tray.setToolTip(`${APP_NAME} — ${server ? "running" : "stopped"} on ${settings.lanAccess && lan ? `${lan}:${settings.port}` : local}`)
-  tray.setContextMenu(Menu.buildFromTemplate([
-    { label: `Open ${APP_NAME}`, click: showWindow },
-    { type: "separator" },
-    { label: server ? `Serving at ${appOrigin()}` : "Server stopped", enabled: false },
-    {
-      label: "Allow access from other devices (LAN)",
-      type: "checkbox",
-      checked: settings.lanAccess,
-      click: async (item) => {
-        settings.lanAccess = item.checked
-        saveSettings()
-        await restartServer()
-      },
-    },
-    {
-      label: "Reddit community posters (r/SpatialPosters)",
-      type: "checkbox",
-      checked: settings.redditPosters,
-      click: async (item) => {
-        settings.redditPosters = item.checked
-        saveSettings()
-        await restartServer()
-      },
-    },
-    {
-      label: "Start with Windows",
-      type: "checkbox",
-      checked: app.getLoginItemSettings().openAtLogin,
-      click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked, args: ["--hidden"] }),
-    },
-    { type: "separator" },
-    { label: "Restart server", click: restartServer },
-    { label: "Open data folder", click: () => shell.openPath(dataDir) },
-    { label: "Open logs folder", click: () => shell.openPath(logDir) },
-    { label: "Open settings file", click: () => { saveSettings(); shell.openPath(settingsFile) } },
-    { type: "separator" },
-    { label: "Quit", click: () => { quitting = true; app.quit() } },
-  ]))
-}
-
-function createTray() {
-  const icon = nativeImage.createFromPath(path.join(__dirname, "assets", "tray.png"))
-  tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon)
-  tray.on("click", showWindow)
-  rebuildTrayMenu()
+  win.once("ready-to-show", () => win.show())
+  win.on("closed", () => { win = null })
+  win.loadURL(origin)
 }
 
 // ---------------------------------------------------------------------------
 // Lifecycle
 
-app.on("second-instance", showWindow)
-app.on("window-all-closed", () => { /* keep running in tray */ })
+app.on("second-instance", () => {
+  if (!win) return
+  if (win.isMinimized()) win.restore()
+  win.focus()
+})
+app.on("window-all-closed", () => app.quit())
 app.on("before-quit", () => { quitting = true })
 app.on("will-quit", (event) => {
   if (!server) return
@@ -368,16 +237,18 @@ app.on("will-quit", (event) => {
 
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null)
-  createTray()
+  // Only requests from this app's own window carry the admin token.
+  session.defaultSession.webRequest.onBeforeSendHeaders({ urls: [`${origin}/*`] }, (details, callback) => {
+    details.requestHeaders["x-admin-token"] = secrets.adminToken
+    callback({ requestHeaders: details.requestHeaders })
+  })
   try {
     await startServer()
   } catch (err) {
-    dialog.showErrorBox(APP_NAME, String(err instanceof Error ? err.message : err))
     quitting = true
+    dialog.showErrorBox(APP_NAME, String(err instanceof Error ? err.message : err))
     app.quit()
     return
   }
-  installAdminHeader()
-  rebuildTrayMenu()
   createWindow()
 })

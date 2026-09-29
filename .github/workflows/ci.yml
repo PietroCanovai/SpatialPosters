@@ -5,6 +5,10 @@ on:
     branches: [master, main]
   pull_request:
 
+defaults:
+  run:
+    working-directory: web
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -17,6 +21,7 @@ jobs:
           # Il runtime di produzione non usa jsdom (devDependency only).
           node-version: 22
           cache: npm
+          cache-dependency-path: web/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npx eslint .
@@ -30,6 +35,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: web/package-lock.json
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test e2e/pictorium-visual.spec.ts
@@ -39,5 +45,5 @@ jobs:
         if: failure()
         with:
           name: visual-test-results
-          path: test-results/
+          path: web/test-results/
           retention-days: 7

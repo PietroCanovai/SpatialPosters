@@ -10,8 +10,8 @@
     "prepare-server": "node scripts/prepare-server.mjs",
     "start": "electron .",
     "build-and-start": "npm run prepare-server && electron .",
-    "dist": "npm run prepare-server && electron-builder --win --publish never",
-    "dist:dir": "npm run prepare-server && electron-builder --win dir --publish never"
+    "dist": "npm run prepare-server && electron-builder --win portable --publish never && node scripts/copy-exe.mjs",
+    "dist:installer": "npm run prepare-server && electron-builder --win nsis --publish never"
   },
   "devDependencies": {
     "electron": "^44.5.0",
@@ -40,7 +40,6 @@
     "publish": null,
     "win": {
       "target": [
-        "nsis",
         "portable"
       ],
       "icon": "assets/icon.png"
@@ -54,7 +53,7 @@
       "deleteAppDataOnUninstall": false
     },
     "portable": {
-      "artifactName": "${productName}-${version}-portable.${ext}"
+      "artifactName": "${productName}.${ext}"
     },
     "afterPack": "scripts/after-pack.cjs"
   }
