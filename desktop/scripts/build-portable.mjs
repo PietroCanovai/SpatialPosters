@@ -54,6 +54,15 @@ trailer.writeBigInt64LE(BigInt(launcher.length), 0)
 trailer.writeBigInt64LE(BigInt(zip.length), 8)
 trailer.write(payloadId.padEnd(24, " "), 16, 24, "ascii")
 trailer.write("SPPAYLD1", 40, 8, "ascii")
-fs.writeFileSync(out, Buffer.concat([launcher, zip, trailer]))
+// Atomic write: double-clicking during a build must never hit a half-written
+// exe (the launcher would report "payload missing or corrupt").
+const tmp = `${out}.new`
+fs.writeFileSync(tmp, Buffer.concat([launcher, zip, trailer]))
+try {
+  fs.renameSync(tmp, out)
+} catch (e) {
+  console.error(`[build-portable] could not replace ${out} (${e.code}). Close SpatialPosters and run build-portable again; the new build is at ${tmp}`)
+  process.exit(1)
+}
 
 console.log(`[build-portable] ${path.relative(process.cwd(), out)} (${(fs.statSync(out).size / 1e6).toFixed(0)} MB, payload ${payloadId})`)

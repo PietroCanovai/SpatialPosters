@@ -38,9 +38,15 @@ static class Launcher
         try
         {
             string self = Process.GetCurrentProcess().MainModule.FileName;
-            long zipOffset, zipLength;
-            string payloadId;
-            ReadTrailer(self, out zipOffset, out zipLength, out payloadId);
+            long zipOffset = 0, zipLength = 0;
+            string payloadId = null;
+            // An exe that is still being written (build or copy in progress) has an
+            // incomplete trailer: retry for a few seconds before giving up.
+            for (int attempt = 0; ; attempt++)
+            {
+                try { ReadTrailer(self, out zipOffset, out zipLength, out payloadId); break; }
+                catch (InvalidDataException) { if (attempt >= 2) throw; Thread.Sleep(1000); }
+            }
 
             string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SpatialPosters", "app");
             string target = Path.Combine(root, payloadId);
@@ -80,7 +86,12 @@ static class Launcher
             payloadId = Encoding.ASCII.GetString(br.ReadBytes(24)).TrimEnd('\0', ' ');
             string magic = Encoding.ASCII.GetString(br.ReadBytes(8));
             if (magic != Magic || zipOffset <= 0 || zipLength <= 0 || zipOffset + zipLength > fs.Length - TrailerSize)
-                throw new InvalidDataException("Launcher payload is missing or corrupt. Rebuild with npm run dist.");
+                throw new InvalidDataException(
+                    "The app data inside this exe is missing or incomplete (the file may still have been copying or building).\n\n" +
+                    "File: " + self + "\n" +
+                    "Size: " + fs.Length + " bytes" +
+                    (magic == Magic ? ", expected " + (zipOffset + zipLength + TrailerSize) : " (end marker not found: the file is cut short)") + "\n\n" +
+                    "Wait a moment and try again, or rebuild with npm run dist.");
             if (payloadId.Length == 0 || payloadId.Any(c => !char.IsLetterOrDigit(c)))
                 throw new InvalidDataException("Launcher payload id is invalid.");
         }

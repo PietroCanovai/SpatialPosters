@@ -1,2 +1,3 @@
 # Built Windows app (see desktop/README.md) - too large for git, attach to a release instead
 /SpatialPosters.exe
+/SpatialPosters.exe.new
