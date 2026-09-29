@@ -184,6 +184,12 @@ function openExternalSafe(url) {
   } catch { /* ignore malformed */ }
 }
 
+// Shown instantly while the server boots, so the window never waits on it.
+const SPLASH = "data:text/html;charset=utf-8," + encodeURIComponent(`<!doctype html><html><head><meta charset="utf-8">
+<style>html,body{margin:0;height:100%;background:#09090b;color:#a1a1aa;font:13px system-ui,sans-serif;display:flex;align-items:center;justify-content:center}
+.s{width:28px;height:28px;border:3px solid #27272a;border-top-color:#fafafa;border-radius:50%;animation:r .8s linear infinite;margin:0 auto 14px}
+@keyframes r{to{transform:rotate(360deg)}}</style></head><body><div><div class="s"></div>Starting SpatialPosters…</div></body></html>`)
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1440,
@@ -216,7 +222,7 @@ function createWindow() {
   })
   win.once("ready-to-show", () => win.show())
   win.on("closed", () => { win = null })
-  win.loadURL(origin)
+  win.loadURL(SPLASH)
 }
 
 // ---------------------------------------------------------------------------
@@ -242,6 +248,7 @@ app.whenReady().then(async () => {
     details.requestHeaders["x-admin-token"] = secrets.adminToken
     callback({ requestHeaders: details.requestHeaders })
   })
+  createWindow()
   try {
     await startServer()
   } catch (err) {
@@ -250,5 +257,5 @@ app.whenReady().then(async () => {
     app.quit()
     return
   }
-  createWindow()
+  if (win) win.loadURL(origin)
 })

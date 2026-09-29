@@ -130,6 +130,12 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true })
     }
 
+    // Validazione chiave TMDB (Impostazioni → API keys): "bad" è rifiutata.
+    if (method === "GET" && pathname === "/3/authentication") {
+      const ok = url.searchParams.get("api_key") !== "bad"
+      return json(res, ok ? 200 : 401, { success: ok })
+    }
+
     // Immagini poster (image.tmdb.org/t/p/... → mock)
     if (method === "GET" && pathname.startsWith("/t/p/")) {
       return respond(res, 200, await getPosterBuffer(), "image/jpeg")

@@ -10,8 +10,7 @@
     "prepare-server": "node scripts/prepare-server.mjs",
     "start": "electron .",
     "build-and-start": "npm run prepare-server && electron .",
-    "dist": "npm run prepare-server && electron-builder --win portable --publish never && node scripts/copy-exe.mjs",
-    "dist:installer": "npm run prepare-server && electron-builder --win nsis --publish never"
+    "dist": "npm run prepare-server && electron-builder --win dir --publish never && node scripts/build-portable.mjs"
   },
   "devDependencies": {
     "electron": "^44.5.0",
@@ -40,21 +39,16 @@
     "publish": null,
     "win": {
       "target": [
-        "portable"
+        "dir"
       ],
       "icon": "assets/icon.png"
     },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "deleteAppDataOnUninstall": false
-    },
-    "portable": {
-      "artifactName": "${productName}.${ext}"
-    },
-    "afterPack": "scripts/after-pack.cjs"
+    "afterPack": "scripts/after-pack.cjs",
+    "electronLanguages": [
+      "en-US",
+      "en-GB",
+      "it",
+      "ja"
+    ]
   }
 }

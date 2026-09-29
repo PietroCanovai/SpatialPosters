@@ -4,8 +4,8 @@ A Windows desktop build of [SpatialPosters](https://github.com/TheAceOfficials/S
 
 ## Getting started
 
-1. Run **`SpatialPosters.exe`**. It's portable, so there's nothing to install.
-2. Open **Settings** and add your TMDB API key (free at themoviedb.org → Settings → API).
+1. Run **`SpatialPosters.exe`**. It's portable, so there's nothing to install. The first launch unpacks itself once (a few seconds), and later launches open in under a second.
+2. Open **Settings → API keys** and add your **TMDB** key (required, free at themoviedb.org → Settings → API). Optionally add **MDBList** for IMDb/Rotten Tomatoes/Letterboxd ratings on badges, and **TVDB** for TVDB episode ordering. Each key is checked with the provider when you save.
 3. Open **Jellyfin** in the sidebar and enter your server URL (e.g. `http://192.168.1.10:8096`) and an API key. Create the key in Jellyfin under **Dashboard → API Keys → +**.
 4. Pick a library, then:
    - **Design** opens the poster editor for that title. Save your design, then press **Send to Jellyfin**.
@@ -16,7 +16,7 @@ Posters are uploaded as the item's primary image, so Jellyfin serves them itself
 
 > If a Jellyfin library scan has *Replace existing images* turned on, it will overwrite uploaded posters. Leave that off for libraries you design.
 
-Your data (designs, defaults, Jellyfin connection) lives in `%APPDATA%\SpatialPosters`.
+Your data (designs, defaults, API keys, Jellyfin connection) lives in `%APPDATA%\SpatialPosters`. The unpacked app is cached in `%LOCALAPPDATA%\SpatialPosters\app`.
 
 ## What's different from upstream
 
@@ -34,6 +34,8 @@ Your data (designs, defaults, Jellyfin connection) lives in `%APPDATA%\SpatialPo
 | `web/` | The SpatialPosters Next.js app ([web/README.md](web/README.md)) |
 
 ## Building
+
+See [CLAUDE.md](CLAUDE.md) for architecture and build gotchas.
 
 Requires Node 22+.
 

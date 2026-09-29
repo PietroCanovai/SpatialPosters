@@ -13,6 +13,7 @@ import { BadgeStyleSelector, MenuItem } from "@/components/ui"
 import { UI_RATING_SOURCES } from "@/lib/ratings"
 import { REGIONS } from "@/lib/regions"
 import { RatingSourceIcon } from "@/components/RatingSourceIcon"
+import { ProviderKeysPanel } from "@/components/ProviderKeysPanel"
 import {
   Star,
   Trophy,
@@ -63,7 +64,9 @@ export function SettingsPanel({ setSettingsOpen, exportData, importData, mobile,
   const { t } = useT()
   const ed = usePosterEditor()
 
-  const [activeTab, setActiveTab] = useState<"style" | "prefs" | "data">("style")
+  const tmdbKeyForTab = usePSelector((v) => v.tmdbKey)
+  // Senza chiave TMDB non si può fare nulla: apri direttamente la scheda chiavi.
+  const [activeTab, setActiveTab] = useState<"keys" | "style" | "prefs" | "data">(tmdbKeyForTab ? "style" : "keys")
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const [editVal, setEditVal] = useState<string | null>(null)
   const [editTxt, setEditTxt] = useState("")
@@ -182,6 +185,20 @@ export function SettingsPanel({ setSettingsOpen, exportData, importData, mobile,
       aria-label={t("ui.settingsTitle")}
       className="flex border-b border-white/10 px-3 sm:px-6 bg-white/[0.02] gap-1 shrink-0"
     >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "keys"}
+        onClick={() => setActiveTab("keys")}
+        className={`flex items-center gap-2 py-3 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+          activeTab === "keys"
+            ? "border-accent-orange text-accent-orange"
+            : "border-transparent text-zinc-400 hover:text-zinc-200"
+        }`}
+      >
+        <KeyRound className="w-3.5 h-3.5" />
+        <span>API keys</span>
+      </button>
       <button
         type="button"
         role="tab"
@@ -1130,12 +1147,13 @@ export function SettingsPanel({ setSettingsOpen, exportData, importData, mobile,
       <div ref={settingsRef} className="space-y-4">
         {tabsNav}
         <div className="pt-2">
+          <ProviderKeysPanel active={activeTab === "keys"} />
           {stylePanel}
           {prefsPanel}
           {dataPanel}
         </div>
         <div className="pt-3">
-          {footer}
+          {activeTab !== "keys" && footer}
         </div>
       </div>
     )
@@ -1185,12 +1203,13 @@ export function SettingsPanel({ setSettingsOpen, exportData, importData, mobile,
 
         {/* Contenuto scrollabile */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <ProviderKeysPanel active={activeTab === "keys"} />
           {stylePanel}
           {prefsPanel}
           {dataPanel}
         </div>
 
-        {footer}
+        {activeTab !== "keys" && footer}
       </div>
     </div>
   )

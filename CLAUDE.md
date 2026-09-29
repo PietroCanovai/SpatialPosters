@@ -1,0 +1,78 @@
+# CLAUDE.md
+
+Fork of [TheAceOfficials/SpatialPosters](https://github.com/TheAceOfficials/SpatialPosters) (itself a rebrand of Eful97/Pictorium), turned into a **Windows desktop app** that designs posters and **uploads them into Jellyfin**.
+
+- Fork: `PietroCanovai/SpatialPosters` (`origin`), upstream remote: `upstream`. Work branch: `windows-app`.
+- **Keep this file updated** whenever architecture, build steps, conventions or gotchas change. It's part of every change, not a follow-up.
+
+## Rules
+
+- **Only ever build the portable exe** (`desktop: npm run dist` → `SpatialPosters.exe` at the repo root). No NSIS/installer targets, no electron-builder `portable` target (see Startup below).
+- `SpatialPosters.exe` is gitignored (over GitHub's 100 MB limit). Never commit it.
+- Regions are limited to **IT, US, GB, JP**. UI languages are limited to **it, en, ja**. Don't re-add others (`web/src/lib/regions.ts`, `utils.ts` `UI_LANGUAGES`, `i18n.ts`, `flixpatrol.ts` `SUPPORTED_COUNTRIES`).
+- No telemetry: keep `NEXT_TELEMETRY_DISABLED=1` in builds and Electron `spellcheck: false` (it downloads dictionaries from Google). Reddit lookups stay opt-in (`SPATIALPOSTERS_REDDIT_POSTERS=1`).
+- Comments in `web/` are Italian (upstream style). Match the surrounding file. `desktop/` is English.
+
+## Layout
+
+```
+SpatialPosters.exe   built portable app (gitignored)
+desktop/             Electron shell, launcher, packaging scripts
+  main.cjs           main process: splash → start server → load app
+  launcher/Launcher.cs   portable self-extracting launcher (C#)
+  scripts/prepare-server.mjs  next build + assemble desktop/server
+  scripts/after-pack.cjs      restore node_modules electron-builder strips
+  scripts/build-portable.mjs  zip + compile launcher + stitch exe
+web/                 upstream Next.js 16 app (moved here from repo root)
+.github/workflows/   CI, runs in web/ (defaults.run.working-directory)
+```
+
+## Commands
+
+```powershell
+# web app
+cd web; npm ci
+npx tsc --noEmit
+npx vitest run            # whole suite; must stay green
+npx eslint <files you touched>   # upstream has ~70 pre-existing lint errors elsewhere
+# desktop
+cd desktop; npm install
+npm run dist              # full build → ..\SpatialPosters.exe (~1 min)
+npm run build-and-start   # build web + run unpacked in Electron (dev)
+```
+
+Use `NEXT_TELEMETRY_DISABLED=1` when running Next/vitest by hand.
+
+## Architecture
+
+**Desktop shell (`desktop/main.cjs`).** It shows a splash window instantly, forks `resources/server/server.js` (Next standalone) in an Electron `utilityProcess` on `127.0.0.1:7272`, then loads the app. Closing the window quits (no tray, no background server). Per-user state lives in `%APPDATA%\SpatialPosters`: `settings.json` (port, redditPosters), `secrets.json`, `data\`, `logs\server.log`.
+
+**Auth.** The upstream admin routes require `SPATIALPOSTERS_ADMIN_TOKEN`. The shell generates a random token (`secrets.json`) and injects `x-admin-token` **only into requests from its own window** (`session.webRequest.onBeforeSendHeaders`). The web client never knows the token. `CONFIG_HMAC_SECRET` is generated there too.
+
+**Startup / launcher.** electron-builder's portable target re-extracted ~110 MB to %TEMP% on every launch (9–12 s). Instead, `build-portable.mjs` builds `win-unpacked` (target `dir`), zips it, and appends it to a small C# launcher compiled with Windows' built-in `csc.exe` (.NET Framework 4.8). The trailer holds the zip offset/length, a 16-hex payload id (sha256 of the zip) and the magic `SPPAYLD1`. The launcher extracts once to `%LOCALAPPDATA%\SpatialPosters\app\<id>\` (marker `.complete`), deletes older ids, then starts it. Measured: first launch after a new build 5–8 s (unpack + delete old version), then ~0.6 s to server ready. `electronLanguages` keeps only en-US/en-GB/it/ja Chromium locales.
+
+**Provider API keys.** Settings → **API keys** tab (`web/src/components/ProviderKeysPanel.tsx`) → `PUT /api/provider-keys` validates each key with the provider and saves it to `data/provider-keys.json`. Upstream reads keys only from env (~20 call sites), so `lib/provider-keys.ts` applies saved keys to `process.env.SPATIALPOSTERS_{TMDB_KEY,MDBLIST_KEY,TVDB_API_KEY}`. That happens at boot (`src/instrumentation.ts`) and on save. The client syncs them via `/api/defaults` `serverKeys` (server wins over localStorage, `lib/context.tsx`).
+
+**Jellyfin.** `lib/jellyfin.ts` (server client, auth header `MediaBrowser … Token="…"`), routes under `app/api/jellyfin/*` (all admin-only), page `app/jellyfin` + `components/JellyfinView.tsx`, and an editor bar `components/JellyfinSendBar.tsx` shown when the editor is opened with `?jf=<itemId>`. Push = render through the normal poster route on loopback (`buildStremioPosterUrl` with the saved mapping + server defaults, `fmt=jpeg`, TMDB key in the `x-api-key` header). The result is POSTed **base64** to `/Items/{id}/Images/Primary`. Jellyfin then serves posters without this app. The poster canvas is fixed at 500×750 (`STD_W/STD_H`) across the renderer.
+
+**SSRF.** User-supplied URLs (poster/logo/backdrop query params, proxy-image, resolve-image, og:image) go through `lib/safe-fetch.ts` (`fetchPublicUrl`): resolved-IP checks on every redirect hop plus a DNS-pinned undici Agent. URLs built from `TMDB_IMG_URL`/IMG_BASE are trusted. The Jellyfin URL is admin-configured (usually a LAN IP), so it deliberately bypasses safe-fetch.
+
+## Gotchas (each cost real debugging time)
+
+- **electron-builder strips every `node_modules` folder from `extraResources`**, including `server/.next/node_modules`. That folder holds Turbopack's hashed aliases (`sharp-<hash>`, `@resvg/resvg-js-<hash>`). Without it every image route and static file 500s ("Failed to load external module sharp-…"), which shows up as broken sidebar icons. `after-pack.cjs` copies all of them back.
+- **Next file tracing drops sharp's `libvips-*.dll`**, and the `.next/node_modules` aliases are junctions pointing into `web/node_modules`. `prepare-server.mjs` copies with `dereference: true` and copies `@img/*`, `@resvg/*` in full.
+- **undici:** passing an npm-undici `Agent` to Node's built-in `fetch` fails ("invalid onRequestStart method"). `safe-fetch.ts` uses undici's own `fetch` with its `Agent`, and `undici` is a declared dependency. Under Vitest it falls back to global `fetch` so mocks apply.
+- **Windows file locks:** if a shell's cwd is inside `desktop/server` or `dist`, `rm`/`rmSync` fails with EPERM/EBUSY. `cd` out first. Kill `SpatialPosters.exe` before rebuilding.
+- Port 7272 in use means another instance is running (the shell shows an error). Tests that launch the exe must `taskkill //IM SpatialPosters.exe //F` afterwards.
+- A `next build` regenerates `web/src/generated/app-version.ts` and `web/src/lib/render-version.ts`. Commit them; the render version busts poster caches.
+
+## Testing without real services
+
+- TMDB/JustWatch/Wikidata/IMDb: `web/e2e/mock-server.mjs` (port 8790). Point the app at it with `TMDB_BASE_URL`, `TMDB_IMG_URL`, `JUSTWATCH_API_URL`, `WIKIDATA_SPARQL_URL`, `IMDB_CHART_URL`. The Electron shell passes its env through, so this works against the real `SpatialPosters.exe`.
+- Jellyfin: a small Node HTTP mock implementing `/System/Info`, `/Library/MediaFolders`, `/Items`, `/Items/{id}/Images/Primary` (GET + base64 POST) is enough for an end-to-end push. Check the upload decodes to a JPEG.
+- The admin token for curl is in `%APPDATA%\SpatialPosters\secrets.json` (`adminToken`). Delete any test `data\jellyfin.json` / `provider-keys.json` afterwards; that folder is the user's real data.
+- Screenshots: render offscreen with a throwaway Electron script (`webPreferences.offscreen`, `capturePage`). Never screen-capture the desktop: it can capture the user's other windows.
+
+## Upstream security/bug fixes carried by this fork
+
+SSRF in the image routes; a UI-set PIN that was never enforced, plus forgeable session secrets; admin token accepted as a PIN / in a query string; addon-proxy undici mismatch; Patreon CTAs removed; Reddit made opt-in. Keep these when merging upstream.

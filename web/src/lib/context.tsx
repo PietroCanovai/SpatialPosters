@@ -521,16 +521,18 @@ export function usePictorium(): PictoriumCtx {
       .then((data) => {
         if (!data?.serverKeys) return
         const { tmdbKey, mdblistApiKey: mdblistKey, tvdbApiKey: tvdbKey } = data.serverKeys
-        if (!savedTmdb && tmdbKey) {
+        // Le chiavi salvate sul server (Impostazioni → API keys) sono la fonte
+        // di verità: vincono su quelle rimaste nel localStorage.
+        if (tmdbKey && tmdbKey !== savedTmdb) {
           setTmdbKeyState(tmdbKey)
           setTmdbKeyInput(tmdbKey)
           safeSetItem("tmdb_key", tmdbKey)
         }
-        if (!savedMdblist && mdblistKey) {
+        if (mdblistKey && mdblistKey !== savedMdblist) {
           setMdblistApiKey(mdblistKey)
           safeSetItem("mdblist_key", mdblistKey)
         }
-        if (!savedTvdb && tvdbKey) {
+        if (tvdbKey && tvdbKey !== savedTvdb) {
           setTvdbApiKey(tvdbKey)
           safeSetItem("tvdb_key", tvdbKey)
         }

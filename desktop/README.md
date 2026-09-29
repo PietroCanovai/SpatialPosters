@@ -17,9 +17,10 @@ On first run the app generates a random admin token and config-signing secret (`
 ```powershell
 npm install
 npm run build-and-start   # build ../web and launch
-npm run dist              # -> ..\SpatialPosters.exe (portable)
-npm run dist:installer    # -> dist\SpatialPosters Setup <ver>.exe (optional NSIS installer)
+npm run dist              # -> ..\SpatialPosters.exe (the only build target)
 ```
+
+`npm run dist` builds only the portable exe. electron-builder produces `dist/win-unpacked` (target `dir`). `scripts/build-portable.mjs` zips it and appends it to a small launcher (`launcher/Launcher.cs`, compiled with the C# compiler that ships with Windows). On first launch the launcher unpacks the app once to `%LOCALAPPDATA%\SpatialPosters\app\<build id>`. Later launches start it directly: about 0.6 s to ready, versus 9–12 s with electron-builder's own portable format, which re-extracts on every run.
 
 `scripts/prepare-server.mjs` runs `next build` in `../web` (telemetry disabled) and assembles `server/` from `.next/standalone`. It dereferences Turbopack's junctions to `sharp`/`resvg` and copies the native packages in full, because Next's tracing drops sharp's libvips DLLs. electron-builder strips every `node_modules` folder from `extraResources`, so `scripts/after-pack.cjs` copies them back. Without that, images and icons fail with `Failed to load external module sharp-<hash>`.
 
