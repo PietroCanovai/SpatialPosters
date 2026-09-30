@@ -7,6 +7,7 @@ import { usePSelector } from "@/lib/context"
 import { useT } from "@/lib/contexts/TranslationContext"
 import { posterUrl } from "@/lib/utils"
 import { BookmarkCheck, ArrowRight, Layers, Sparkles } from "lucide-react"
+import { getLang } from "@/lib/i18n"
 import type { Mapping } from "@/lib/types"
 
 interface SavedPostersBundleProps {
@@ -100,7 +101,7 @@ export function SavedPostersBundle({ onOpenLightbox }: SavedPostersBundleProps) 
               zIndex = 50
             }
 
-            const posterSrc = m.imgbbUrl || `/api/poster/${m.mediaType}/${m.tmdbId}` || (m.posterPath ? posterUrl(m.posterPath, "w342") : null)
+            const posterSrc = `/api/poster/${m.mediaType}/${m.tmdbId}?lang=${getLang()}`
 
             return (
               <div

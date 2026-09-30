@@ -331,7 +331,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
   const reqRatingSources = qRsrc !== null
     ? qRsrc.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
     : undefined
-  const t = createT(req.nextUrl.searchParams.get("lang") || mapping?.language || "it")
+  const t = createT(req.nextUrl.searchParams.get("lang") || "en")
 
   if (queryPoster) {
     posterPath = queryPoster
@@ -395,7 +395,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
       return new Response(null, { status: 304, headers: posterNotModifiedHeaders(etag, immutablePoster, dynamicPoster) })
     }
   } else {
-    const preferredLanguage = req.nextUrl.searchParams.get("lang") || "it"
+    const preferredLanguage = req.nextUrl.searchParams.get("lang") || "en"
     const apiKey = resolveRequestApiKey(req)
     try {
       // F6: session cache editor — i tick di preview sullo stesso titolo
@@ -768,7 +768,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
       (tmdbNetworks.length === 0 && productionCompanies.length === 0)
         ? (async () => {
             const apiKey = resolveRequestApiKey(req)
-            const preferredLang = req.nextUrl.searchParams.get("lang") || mapping?.language || "it"
+            const preferredLang = req.nextUrl.searchParams.get("lang") || "en"
             // F6: anche il refetch dei dettagli TV riusa la session cache.
             const details = getTMDBSessionCache(mediaType, tmdbId)?.details
               ?? (await getDetails(mediaType, tmdbId, preferredLang, apiKey, renderAbort.signal).catch(() => null))
@@ -811,7 +811,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
       rankingResult,
       finalRank,
       // Fix L32: lingua per la risoluzione delle label prefissate (__badge.*).
-      lang: req.nextUrl.searchParams.get("lang") || mapping?.language || "it",
+      lang: req.nextUrl.searchParams.get("lang") || "en",
     })
     const {
       badgeStyle, rankingBadgeStyle,
@@ -824,7 +824,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<RouteP
 
 
 
-    const locale = req.nextUrl.searchParams.get("lang") || mapping?.language || "it"
+    const locale = req.nextUrl.searchParams.get("lang") || "en"
     const targetCenter = Math.round(30 * STD_H / 570)
 
     // 8. Pre-resolve accent color override

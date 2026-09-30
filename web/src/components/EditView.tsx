@@ -61,7 +61,7 @@ export default function EditView() {
   const handleSend = useCallback(async () => {
     if (!selected || sending) return
     if (!tmdbKey) {
-      toast.error("Add your TMDB API key in Settings → API keys first.")
+      toast.error(t("keys.needTmdb"))
       return
     }
     setSending(true)
@@ -69,14 +69,14 @@ export default function EditView() {
       if (previewPoster) await saveConfig({ silent: true })
       const res = await jellyfinApi.pushTitle(selected.id, selected.media_type === "tv" ? "tv" : "movie", tmdbKey, getLang(), mdblistKey)
       const names = res.items.map((i) => i.name).join(", ")
-      toast.success(`Sent to Jellyfin${names ? `: ${names}` : ""}`)
+      toast.success(`${t("jf.sent")}${names ? `: ${names}` : ""}`)
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
-      toast.error(`Saved, but not sent to Jellyfin: ${message}`)
+      toast.error(t("jf.savedNotSent", { message }))
     } finally {
       setSending(false)
     }
-  }, [selected, previewPoster, sending, tmdbKey, mdblistKey, saveConfig])
+  }, [selected, previewPoster, sending, tmdbKey, mdblistKey, saveConfig, t])
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
@@ -121,17 +121,17 @@ export default function EditView() {
           )}
           <JwRankBadge tmdbId={selected.id} type={selected.media_type === "movie" ? "movie" : "tv"} regionCode={ed.defaultRegion} />
           {mapping && (
-            <button type="button" aria-label={t("ui.remove")} title="Delete the saved design"
+            <button type="button" aria-label={t("ui.remove")} title={t("jf.deleteDesign")}
                     onClick={() => { removeMapping(mapping).catch((e) => console.error("[spatialposters] Remove mapping failed:", e)) }}
                     className="btn-danger min-h-[40px] px-3 rounded-xl text-xs">
               <Trash2 className="w-4 h-4" />
             </button>
           )}
           <button type="button" onClick={handleSend} disabled={sending}
-                  title="Save the design and upload it to Jellyfin (Ctrl+S)"
+                  title={t("jf.sendTitle")}
                   className="btn-primary min-h-[40px] px-5 rounded-xl disabled:opacity-50">
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            Send to Jellyfin
+            {t("jf.sendToJellyfin")}
           </button>
         </div>
       </div>
@@ -217,7 +217,7 @@ export default function EditView() {
             </div>
             {!tmdbKey && (
               <p className="text-[11px] text-amber-300 mt-4">
-                Add your TMDB key in <Link href="/settings" className="underline">Settings → API keys</Link>.
+                {t("keys.needTmdbShort")} <Link href="/settings" className="underline">{t("keys.settingsPath")}</Link>.
               </p>
             )}
           </EditorPanel>

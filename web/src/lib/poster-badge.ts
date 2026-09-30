@@ -156,7 +156,7 @@ export function computeTopBadge(input: BadgeInput, t: BadgeT, locale?: string): 
     mediaType: input.mediaType,
     releaseDate: input.releaseDate,
     firstAirDate: input.firstAirDate,
-    locale: locale || "it",
+    locale: locale || "en",
     t,
   })
 

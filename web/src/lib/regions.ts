@@ -26,15 +26,18 @@ export interface RegionDef {
   /** Nome lingua in lingua nativa (per il selettore lingua). */
   readonly languageName: string
   /** Nome italiano per manifest/UI. */
+  /** Nome inglese (fallback); in UI usare t(`region.${code}`). */
   readonly label: string
+  /** Nome nella lingua del paese: usato nel selettore lingua, prima che la lingua sia scelta. */
+  readonly nativeLabel: string
   readonly flag: string
 }
 
 export const REGIONS: readonly RegionDef[] = [
-  { code: "IT", flixSlug: "italy", lang: "it-IT", lang2: "it", languageName: "Italiano", label: "Italia", flag: "🇮🇹" },
-  { code: "US", flixSlug: "united-states", lang: "en-US", lang2: "en", languageName: "English", label: "USA", flag: "🇺🇸" },
-  { code: "GB", flixSlug: "united-kingdom", lang: "en-GB", lang2: "en", languageName: "English", label: "Regno Unito", flag: "🇬🇧" },
-  { code: "JP", flixSlug: "japan", lang: "ja-JP", lang2: "ja", languageName: "日本語", label: "Giappone", flag: "🇯🇵" },
+  { code: "IT", flixSlug: "italy", lang: "it-IT", lang2: "it", languageName: "Italiano", label: "Italy", nativeLabel: "Italia", flag: "🇮🇹" },
+  { code: "US", flixSlug: "united-states", lang: "en-US", lang2: "en", languageName: "English", label: "United States", nativeLabel: "United States", flag: "🇺🇸" },
+  { code: "GB", flixSlug: "united-kingdom", lang: "en-GB", lang2: "en", languageName: "English", label: "United Kingdom", nativeLabel: "United Kingdom", flag: "🇬🇧" },
+  { code: "JP", flixSlug: "japan", lang: "ja-JP", lang2: "ja", languageName: "日本語", label: "Japan", nativeLabel: "日本", flag: "🇯🇵" },
 ] as const
 
 const BY_CODE = new Map(REGIONS.map((r) => [r.code, r]))
@@ -92,7 +95,7 @@ export function isSupportedUiLang(code: string | null | undefined): boolean {
 /** Voce del selettore lingua per una regione: bandiera + paese + lingua. */
 export function regionLangOption(regionCode: string): { key: string; lang: string; flag: string; name: string; sub: string } {
   const r = getRegionDef(regionCode)
-  return { key: r.code, lang: r.lang2, flag: r.flag, name: `${r.label} · ${r.languageName}`, sub: r.lang2.toUpperCase() }
+  return { key: r.code, lang: r.lang2, flag: r.flag, name: `${r.nativeLabel} · ${r.languageName}`, sub: r.lang2.toUpperCase() }
 }
 
 /**

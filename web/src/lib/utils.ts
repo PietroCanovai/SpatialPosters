@@ -79,7 +79,8 @@ export const PICKER_LANGS = REGIONS.map((r) => ({
   key: r.code,
   code: r.lang2,
   flag: r.flag,
-  name: `${r.label} · ${r.languageName}`,
+  // Nel selettore lingua ogni voce è scritta nella propria lingua.
+  name: `${r.nativeLabel} · ${r.languageName}`,
   sub: r.lang2.toUpperCase(),
 }))
 

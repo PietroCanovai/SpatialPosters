@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
             }
             if (!tmdbId) return null
             try {
-              const found = await getDetails(mediaType, tmdbId, "it-IT", tmdbKey)
+              const found = await getDetails(mediaType, tmdbId, "en-US", tmdbKey)
               return {
                 id: tmdbId,
                 title: found.title || found.name || entry.title || "",

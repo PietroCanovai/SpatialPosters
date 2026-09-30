@@ -43,14 +43,14 @@ describe("EditView", () => {
     renderWithCtx(<EditView />, { selected: mockSelected, previewPoster: clean })
     expect(screen.getByText("Fight Club")).toBeInTheDocument()
     expect(screen.getAllByText("ui.previewLive")[0]).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /send to jellyfin/i })).toBeEnabled()
+    expect(screen.getByRole("button", { name: /jf.sendToJellyfin/ })).toBeEnabled()
     expect(screen.queryByText("ui.savePoster")).not.toBeInTheDocument()
     expect(screen.queryByText("ui.testUrl")).not.toBeInTheDocument()
   })
 
   it("can send even before a poster is picked (the server picks the best one, as in the preview)", () => {
     renderWithCtx(<EditView />, { selected: mockSelected })
-    expect(screen.getByRole("button", { name: /send to jellyfin/i })).toBeEnabled()
+    expect(screen.getByRole("button", { name: /jf.sendToJellyfin/ })).toBeEnabled()
   })
 
   it("shows the image size on poster tiles", () => {
@@ -64,6 +64,6 @@ describe("EditView", () => {
     const tab = screen.getByRole("button", { name: "ui.transform" })
     await u.click(tab)
     expect(tab).toHaveClass("tab-chip-active")
-    expect(screen.getByText("Zoom in to move the poster.")).toBeInTheDocument()
+    expect(screen.getByText("ui.zoomToMove")).toBeInTheDocument()
   })
 })

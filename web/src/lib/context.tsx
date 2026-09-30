@@ -253,7 +253,7 @@ export function usePictorium(): PictoriumCtx {
     try { localStorage.setItem(key, val) } catch { /* localStorage non disponibile */ }
   }, [])
 
-  const [lang, setLang] = useState("it")
+  const [lang, setLang] = useState("en")
   const t = useMemo(() => createT(lang), [lang])
   const [tmdbKey, setTmdbKeyState] = useState("")
   const [mdblistApiKey, setMdblistApiKey] = useState("")

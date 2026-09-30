@@ -52,8 +52,8 @@ describe("regions", () => {
     expect(regionToFlixSlug("atlantis")).toBe("united-states")
     expect(getRegionDef("JP").lang).toBe("ja-JP")
     expect(getRegionDef("GB").lang).toBe("en-GB")
-    expect(getRegionDef("IT")).toMatchObject({ flag: "🇮🇹", label: "Italia" })
-    expect(getRegionDef("US")).toMatchObject({ flag: "🇺🇸", label: "USA" })
+    expect(getRegionDef("IT")).toMatchObject({ flag: "🇮🇹", label: "Italy", nativeLabel: "Italia" })
+    expect(getRegionDef("US")).toMatchObject({ flag: "🇺🇸", label: "United States" })
   })
 
   it("flixSlugToRegionCode round-trips supported slugs", () => {

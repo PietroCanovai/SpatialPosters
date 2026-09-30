@@ -19,10 +19,10 @@ describe("SetupWizard", () => {
     renderWizard()
     // 4 voci lingua (una per nazionalita) + tasto back assente al passo 1
     expect(screen.getByText("Italia · Italiano")).toBeInTheDocument()
-    expect(screen.getByText("USA · English")).toBeInTheDocument()
-    expect(screen.getByText("Regno Unito · English")).toBeInTheDocument()
+    expect(screen.getByText("United States · English")).toBeInTheDocument()
+    expect(screen.getByText("United Kingdom · English")).toBeInTheDocument()
     expect(screen.queryByText("Israele · עברית")).not.toBeInTheDocument()
-    expect(screen.getByText("Giappone · 日本語")).toBeInTheDocument()
+    expect(screen.getByText("日本 · 日本語")).toBeInTheDocument()
     expect(screen.queryByText("Back")).not.toBeInTheDocument()
   })
 
@@ -30,17 +30,17 @@ describe("SetupWizard", () => {
     const user = userEvent.setup()
     const { onPickLang, onPickRegion, onDone } = renderWizard()
 
-    await user.click(screen.getByText("USA · English"))
+    await user.click(screen.getByText("United States · English"))
     expect(onPickLang).toHaveBeenCalledWith("en")
     
     // Attendi la transizione del passo (180ms timeout)
     await waitFor(() => {
       expect(screen.getByText("ui.setupRegionTitle")).toBeInTheDocument()
     })
-    expect(screen.getByText("Italia")).toBeInTheDocument()
-    expect(screen.queryByText("USA · English")).not.toBeInTheDocument()
+    expect(screen.getByText("region.IT")).toBeInTheDocument()
+    expect(screen.queryByText("United States · English")).not.toBeInTheDocument()
 
-    await user.click(screen.getByText("Giappone"))
+    await user.click(screen.getByText("region.JP"))
     expect(onPickRegion).toHaveBeenCalledWith("JP")
     await waitFor(() => {
       expect(onDone).toHaveBeenCalledTimes(1)
@@ -51,7 +51,7 @@ describe("SetupWizard", () => {
     const user = userEvent.setup()
     const { onPickLang, onPickRegion, onDone } = renderWizard()
 
-    await user.click(screen.getByText("Giappone · 日本語"))
+    await user.click(screen.getByText("日本 · 日本語"))
     expect(onPickLang).toHaveBeenCalledWith("ja")
     await waitFor(() => {
       expect(screen.getByText("ui.setupRegionTitle")).toBeInTheDocument()

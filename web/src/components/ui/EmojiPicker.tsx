@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react"
 import { Smile, ChevronDown, ChevronUp } from "lucide-react"
+import { useT } from "@/lib/contexts/TranslationContext"
 
 export const EMOJI_CATEGORIES = [
   {
@@ -26,6 +27,7 @@ interface EmojiPickerProps {
 }
 
 export function EmojiPicker({ currentName, onSelectEmoji }: EmojiPickerProps) {
+  const { t } = useT()
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -77,7 +79,7 @@ export function EmojiPicker({ currentName, onSelectEmoji }: EmojiPickerProps) {
           }`}
         >
           <Smile className="w-3 h-3 text-accent-orange" />
-          <span>{isOpen ? "Chiudi" : "Altre emoji"}</span>
+          <span>{isOpen ? t("ui.close") : t("ui.moreEmoji")}</span>
           {isOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
       </div>

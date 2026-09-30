@@ -266,7 +266,7 @@ export async function getJWRankings(
   country = "IT",
   first = 20,
   packages?: readonly string[] | string[],
-  language = "it-IT",
+  language = "en-US",
 ): Promise<JWRankEntry[]> {
   const pkgKey = packages && packages.length > 0 ? packages.join(",") : "all"
   // La lingua entra nella key: i titoli JW seguono la lingua query.
@@ -401,7 +401,7 @@ export async function getJWTitles(opts: JWTitleOptions): Promise<JWRankEntry[]> 
     packages,
     genres,
     sortBy = "POPULAR",
-    language = "it-IT",
+    language = "en-US",
   } = opts
 
   const pkgKey = packages && packages.length > 0 ? packages.join(",") : "all"
@@ -539,7 +539,7 @@ export async function getJWTitleQuality(
   searchTitle?: string | null,
   country = "IT",
   signal?: AbortSignal,
-  language = "it-IT",
+  language = "en-US",
 ): Promise<JWQuality | null> {
   const cacheKey = `${objectType}:${country}:${tmdbId}`
   const cached = qualityCache.get(cacheKey)

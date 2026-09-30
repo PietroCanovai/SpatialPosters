@@ -165,12 +165,12 @@ describe("ordering — first match wins, check rule priority correctness", () =>
 
 // ── LOCALISATION TESTS ──────────────────────────────────────────────
 describe("localisation — labels resolve by locale", () => {
-  it("returns Italian for undefined locale", () => {
-    expect(getSubGenreLabel(["zombie"])).toBe("Film di Zombie")
+  it("returns English for undefined locale", () => {
+    expect(getSubGenreLabel(["zombie"])).toBe(getSubGenreLabel(["zombie"], "en"))
   })
 
-  it("falls back to Italian for unsupported locale", () => {
-    expect(getSubGenreLabel(["zombie"], "zh")).toBe("Film di Zombie")
+  it("falls back to English for unsupported locale", () => {
+    expect(getSubGenreLabel(["zombie"], "zh")).toBe(getSubGenreLabel(["zombie"], "en"))
   })
 
   it("resolves English labels", () => {

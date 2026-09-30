@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!rl.ok) return rateLimitResponse(rl.retAfter)
   const { id } = await params
   const type = req.nextUrl.searchParams.get("type") || "movie"
-  const language = req.nextUrl.searchParams.get("language") || "it-IT"
+  const language = req.nextUrl.searchParams.get("language") || "en-US"
   const apiKey = req.nextUrl.searchParams.get("api_key") || undefined
   const mdblistKey = req.nextUrl.searchParams.get("mdblist_key") || undefined
   const rsrc = req.nextUrl.searchParams.get("rsrc") || undefined

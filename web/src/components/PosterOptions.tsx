@@ -484,7 +484,7 @@ export function PosterOptions({ posters: tmdbPosters, posterActivePath, lang, se
           {sources.length > 1 && (
             <div className="w-full min-w-0">
               <div className="flex items-center gap-1 overflow-x-auto scrollbar-none scroll-fade-mask" role="tablist" aria-label="Poster source">
-                <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 px-1 shrink-0">Source</span>
+                <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 px-1 shrink-0">{t("ui.source")}</span>
                 {sources.map((src) => (
                   <button
                     key={src.key}
@@ -557,7 +557,7 @@ export function PosterOptions({ posters: tmdbPosters, posterActivePath, lang, se
           <div className="px-0.5 mb-2">
             <button
               type="button"
-              aria-label="Add custom poster URL"
+              aria-label={t("ui.addCustomUrlAria")}
               onClick={() => setShowUrlInput(!showUrlInput)}
               className={`w-full h-8 px-3 rounded-xl border transition-all flex items-center justify-center gap-1.5 text-xs font-medium shadow-sm ${
                 showUrlInput

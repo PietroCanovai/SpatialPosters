@@ -165,7 +165,7 @@ export function LangPicker({ onPickLang, onPickRegion, onDone }: SetupWizardProp
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-bold text-zinc-100 group-hover:text-accent-orange transition-colors truncate">
-                        {r.label}
+                        {t(`region.${r.code}`)}
                       </p>
                       <p className="text-[11px] font-mono text-zinc-400 uppercase tracking-widest mt-0.5">
                         {r.code}

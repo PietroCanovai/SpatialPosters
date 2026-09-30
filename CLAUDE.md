@@ -11,7 +11,7 @@ Fork of [TheAceOfficials/SpatialPosters](https://github.com/TheAceOfficials/Spat
 - `SpatialPosters.exe` is gitignored (over GitHub's 100 MB limit). Never commit it.
 - Regions are limited to **IT, US, GB, JP**. UI languages are limited to **it, en, ja**. Don't re-add others (`web/src/lib/regions.ts`, `utils.ts` `UI_LANGUAGES`, `i18n.ts`, `flixpatrol.ts` `SUPPORTED_COUNTRIES`).
 - No telemetry: keep `NEXT_TELEMETRY_DISABLED=1` in builds and Electron `spellcheck: false` (it downloads dictionaries from Google). Reddit lookups stay opt-in (`SPATIALPOSTERS_REDDIT_POSTERS=1`).
-- **Jellyfin only.** Everything Stremio / Nuvio / addon / catalog / install-hub, plus the hosted-service backends (Cloudinary, ImgBB, R2, Upstash/Vercel KV, Docker/Vercel/HF deploy files) has been removed. Don't bring any of it back. Data providers stay: TMDB (required), MDBList (ratings), JustWatch/FlixPatrol/Wikidata (badges).
+- **Jellyfin only.** Everything Stremio / Nuvio / addon / catalog / install-hub, plus the hosted-service backends (Cloudinary, ImgBB, R2, Upstash/Vercel KV, Docker/Vercel/HF deploy files) has been removed. Don't bring any of it back. Data providers stay: TMDB (required), MDBList (ratings), JustWatch/FlixPatrol/Wikidata (badges), plus the extra poster sources below.
 - No SpatialPosters marketing/branding UI (no animated "SPATIAL" word, no tagline, no Patreon/Instagram/GitHub-star footers). A plain logo on the home page is fine.
 - Comments in `web/` are Italian (upstream style). Match the surrounding file. `desktop/` is English.
 
@@ -53,9 +53,29 @@ Use `NEXT_TELEMETRY_DISABLED=1` when running Next/vitest by hand.
 
 **Startup / launcher.** electron-builder's portable target re-extracted ~110 MB to %TEMP% on every launch (9–12 s). Instead, `build-portable.mjs` builds `win-unpacked` (target `dir`), zips it, and appends it to a small C# launcher compiled with Windows' built-in `csc.exe` (.NET Framework 4.8). The trailer holds the zip offset/length, a 16-hex payload id (sha256 of the zip) and the magic `SPPAYLD1`. The exe is written to `SpatialPosters.exe.new` and renamed into place, so it is never half-written. A double-click during a rebuild used to hit a partial file and show "payload missing or corrupt". The launcher retries briefly, then reports the file path and size. It extracts once to `%LOCALAPPDATA%\SpatialPosters\app\<id>\` (marker `.complete`), deletes older ids, then starts it. Measured: first launch after a new build 5–8 s (unpack + delete old version), then ~0.6 s to server ready. `electronLanguages` keeps only en-US/en-GB/it/ja Chromium locales.
 
-**Provider API keys.** Settings → **API keys** tab (`web/src/components/ProviderKeysPanel.tsx`) → `PUT /api/provider-keys` validates each key with the provider and saves it to `data/provider-keys.json`. Only TMDB and MDBList: TVDB was used only for Stremio episode ordering and was removed. Upstream reads keys only from env (~20 call sites), so `lib/provider-keys.ts` applies saved keys to `process.env.SPATIALPOSTERS_{TMDB_KEY,MDBLIST_KEY}`. That happens at boot (`src/instrumentation.ts`) and on save. The client syncs them via `/api/defaults` `serverKeys` (server wins over localStorage, `lib/context.tsx`).
+**Provider API keys.** Settings → **API keys** tab (`web/src/components/ProviderKeysPanel.tsx`) → `PUT /api/provider-keys` validates each key with the provider and saves it to `data/provider-keys.json`. Keys: TMDB, MDBList, TheTVDB, Fanart.tv, AniDB (a registered *client name*, version 1, not a secret). Upstream reads keys only from env (~20 call sites), so `lib/provider-keys.ts` applies saved keys to `process.env.SPATIALPOSTERS_{TMDB_KEY,MDBLIST_KEY,TVDB_API_KEY,FANART_KEY,ANIDB_CLIENT}`. That happens at boot (`src/instrumentation.ts`) and on save. The client syncs them via `/api/defaults` `serverKeys` (server wins over localStorage, `lib/context.tsx`).
 
 **Jellyfin.** `lib/jellyfin.ts` (server client, auth header `MediaBrowser … Token="…"`), routes under `app/api/jellyfin/*` (all admin-only), page `app/jellyfin` + `components/JellyfinView.tsx`. The editor's only action is **Send to Jellyfin**: it saves the design (if a poster was picked) and calls `POST /api/jellyfin/push` with `{ tmdbId, mediaType }`; the route finds every library item with that TMDB id (`findItemsByTmdb`: `AnyProviderIdEquals=Tmdb.<id>`, verified, falling back to a cached full-library scan). The Jellyfin page sends `{ itemId }`. Push = render through the normal poster route on loopback (`buildPosterRenderUrl` in `lib/poster-render-url.ts` with the saved mapping + server defaults, `fmt=jpeg`, TMDB key in the `x-api-key` header). The result is POSTed **base64** to `/Items/{id}/Images/Primary`. Jellyfin then serves posters without this app. The poster canvas is fixed at 500×750 (`STD_W/STD_H`) across the renderer.
+
+**Extra poster sources (`lib/poster-providers.ts`, `GET /api/posters/providers?type&id[&force=1]`, admin-only).**
+- TheTVDB (v4, key), Fanart.tv (key) and TVmaze.
+- Anime only (TMDB genre 16 + original language ja; ids from `api.ani.zip/mappings?themoviedb_id=`):
+  - AniList and Kitsu.
+  - AniDB (client name). The HTTP API needs requests serialized at least 2.1 s apart, or AniDB bans the IP.
+  - AniSearch (CDN cover, HEAD-checked).
+- Results are TMDBImage-shaped with an absolute `file_path` and a `source` field, and are cached 24 h.
+- The editor's poster list has a **Source** row that lists only sources with posters.
+- Custom URLs/Reddit and best-fit auto-select exist only for the TMDB source. Switching source must never change the chosen poster.
+- Language codes: posters without a known language get `"und"` (Unknown language tab); `null` means textless.
+- "stagemedia" (user request) is unidentified; the user was asked what it is.
+
+**Language.**
+- The UI language (`getLang()`, it/en/ja) must reach every server render: thumbnails and previews pass `?lang=`.
+- All server-side fallbacks are **English** (`"en"`/`"en-US"`). Upstream fell back to Italian, which mixed Italian badges into an English UI.
+- A mapping's `language` is the poster artwork's text language, never the UI locale.
+- Region names come from `t("region.<code>")`. In `regions.ts`, `label` is the English fallback; `nativeLabel` is used only in the first-run language picker.
+- No hard-coded UI strings: add keys to all three `lib/translations/*.json` (the parity test enforces it).
+- In component tests `t` returns the key, so assert on keys.
 
 **Navigation.** Every screen is a real Next route: `/` (HomeView), `/search?q=`, `/myposters`, `/movie/[id]` + `/tv/[id]` (editor, `PosterEditorContainer` → `openPoster`), `/jellyfin`, `/settings`, `/status`. Opening a title is `navigateToPoster` = `router.push(editorHref)` (the clicked result's title is stashed in sessionStorage to show immediately). Upstream used fake in-page "views" with hand-made `history.pushState`, which desynced the browser history from Next's router — don't reintroduce that. `BackButton` = `router.back()` (home only when there's no history). All pages share `AppShell` (sidebar, language picker, PIN lock), which renders its children only after mount (client state from localStorage made SSR hydration fail).
 
@@ -65,7 +85,7 @@ Use `NEXT_TELEMETRY_DISABLED=1` when running Next/vitest by hand.
 
 **Accent colour.** `accentColor` in the context is the **custom** colour only (null = automatic); the colour picked from the poster is `autoAccentColor` (`useRootColors` sets only that). UI theming uses `accentColor || autoAccentColor`. Don't let anything write the automatic colour into `accentColor`: it would overwrite per-poster colours.
 
-**UI details.** Poster tiles show the TMDB original's resolution (`PosterBtn`). Horizontal chip rows (`.scroll-fade-mask`) fade an edge only where content is actually hidden (`ScrollFadeManager` sets `data-fade-left/right`). Native `<select>` popups need `color-scheme: dark` (set in `globals.css`) or Chromium draws them light. Inter is loaded from `@fontsource`, never Google Fonts. `next.config.ts` sets `agentRules: false` so `next dev` doesn't generate AGENTS.md/CLAUDE.md in `web/`.
+**UI details.** Poster tiles use `w342` thumbnails (w154 was blurry on HiDPI) and show the original's resolution in an 11px label (`PosterBtn`). Horizontal chip rows (`.scroll-fade-mask`) fade an edge only where content is actually hidden (`ScrollFadeManager` sets `data-fade-left/right`). Native `<select>` popups need `color-scheme: dark` (set in `globals.css`) or Chromium draws them light. Inter is loaded from `@fontsource`, never Google Fonts. `next.config.ts` sets `agentRules: false` so `next dev` doesn't generate AGENTS.md/CLAUDE.md in `web/`.
 
 **SSRF.** User-supplied URLs (poster/logo/backdrop query params, proxy-image, resolve-image, og:image) go through `lib/safe-fetch.ts` (`fetchPublicUrl`): resolved-IP checks on every redirect hop plus a DNS-pinned undici Agent. URLs built from `TMDB_IMG_URL`/IMG_BASE are trusted. The Jellyfin URL is admin-configured (usually a LAN IP), so it deliberately bypasses safe-fetch.
 

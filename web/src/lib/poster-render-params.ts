@@ -75,7 +75,7 @@ export function buildPosterRenderSearchParams(input: PosterRenderParamsInput): U
   if (input.ribbonSide === "right") params.set("side", "right")
   else if (input.ribbonSide === "left") params.set("side", "left")
 
-  params.set("lang", input.lang || "it")
+  params.set("lang", input.lang || "en")
   if (!blurEnabled) params.set("be", "0")
   params.set("gradHeight", String(input.gradientHeight ?? DEFAULT_POSTER_PARAMS.gradientHeight))
   params.set("blur", String(input.blurIntensity ?? DEFAULT_POSTER_PARAMS.blurIntensity))

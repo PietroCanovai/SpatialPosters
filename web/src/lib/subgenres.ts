@@ -105,15 +105,15 @@ function matchKeywordPattern(keyword: string, kwPattern: string): boolean {
   return regex.test(keyword)
 }
 
-export function getSubGenreLabel(keywords: string[], locale = "it"): string | null {
+export function getSubGenreLabel(keywords: string[], locale = "en"): string | null {
   if (!keywords || !keywords.length) return null
   const normalized = keywords.map((k) => k.toLowerCase().trim())
   for (const sub of SUB_GENRES) {
     if (sub.keywords.some((kwPattern) => normalized.some((nk) => matchKeywordPattern(nk, kwPattern)))) {
-      const lang = (locale || "it").slice(0, 2)
+      const lang = (locale || "en").slice(0, 2)
       // it/en/fr/de/es/he hanno tutti i 14 label; ja/ko/pt ripiegano
       // ancora sull'italiano (bug preesistente, fuori dallo scope qui).
-      return sub.labels[lang] || sub.labels.it
+      return sub.labels[lang] || sub.labels.en || sub.labels.it
     }
   }
   return null

@@ -4,6 +4,7 @@ import React from "react"
 import { Check, Trash2, Maximize2, Folder } from "lucide-react"
 import { posterUrl } from "@/lib/utils"
 import type { Mapping } from "@/lib/types"
+import { getLang } from "@/lib/i18n"
 import { PosterDepthEdge, PosterDepthSheen } from "@/components/PosterDepthGlow"
 
 interface MoodBoardTileProps {
@@ -39,7 +40,7 @@ export function MoodBoardTile({
     : (m.genreName || "").toLowerCase().includes("anim")
       ? t("ui.filterAnime")
       : t("ui.tvSeries")
-  const displaySrc = m.imgbbUrl || `/api/poster/${m.mediaType}/${m.tmdbId}` || (m.posterPath ? posterUrl(m.posterPath, "w342") : null)
+  const displaySrc = `/api/poster/${m.mediaType}/${m.tmdbId}?lang=${getLang()}`
 
   return (
     <div

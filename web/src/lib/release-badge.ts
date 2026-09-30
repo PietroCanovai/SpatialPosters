@@ -22,7 +22,7 @@ export function getUpcomingReleaseLabel(input: {
   if (date.getTime() <= today.getTime()) return null
 
   const translate = input.t ?? tGlobal
-  return translate("badge.upcomingRelease", { date: formatReleaseDate(date, input.locale ?? "it") })
+  return translate("badge.upcomingRelease", { date: formatReleaseDate(date, input.locale ?? "en") })
 }
 
 function parseTmdbDate(value?: string | null): Date | null {

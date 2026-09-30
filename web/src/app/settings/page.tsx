@@ -54,7 +54,7 @@ function SettingsContent() {
                 </div>
                 <div>
                   <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100 flex items-center gap-2">
-                    <span>{t("ui.settingsTitle") || "Impostazioni"}</span>
+                    <span>{t("ui.settingsTitle")}</span>
                   </h1>
                   <p className="text-xs text-zinc-400 mt-1 max-w-xl leading-relaxed">
                     {t("ui.settingsSubtitle") || "Configure poster defaults, system preferences, PIN security and cache."}

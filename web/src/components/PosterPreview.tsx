@@ -73,7 +73,7 @@ export function PosterPreview({ previewLoading, loadProgress, imageError, setIma
     : null
 
   return (
-    <div role="img" aria-label={`Preview of ${selected?.title || selected?.name || ""} poster with ${selectedLogo ? "logo" : "no logo"}`}
+    <div role="img" aria-label={t("ui.previewAria", { title: selected?.title || selected?.name || "" })}
          className={`preview-frame w-full rounded-[1.35rem] overflow-hidden relative ${previewPoster ? "preview-frame-active" : ""}`}>
       <div className="relative aspect-[2/3] select-none pointer-events-none bg-zinc-950/70 overflow-hidden rounded-[1.2rem]">
         {previewUrl ? (

@@ -70,7 +70,7 @@ export function TransformControls() {
                      boundsMin={-maxPanY} boundsMax={maxPanY} onChange={(v) => ed.setPosterOffsetY(clampPan(v, maxPanY))} onDoubleClick={() => ed.setPosterOffsetY(0)}
                      editingKey="poy" {...edit} />
           {ed.posterScale === 100 && (
-            <p className="text-[11px] text-zinc-500 px-1">Zoom in to move the poster.</p>
+            <p className="text-[11px] text-zinc-500 px-1">{t("ui.zoomToMove")}</p>
           )}
         </div>
       </div>

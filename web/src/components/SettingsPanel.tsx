@@ -196,7 +196,7 @@ export function SettingsPanel({ setSettingsOpen, exportData, importData, mobile,
         }`}
       >
         <KeyRound className="w-3.5 h-3.5" />
-        <span>API keys</span>
+        <span>{t("ui.apiKeysTab")}</span>
       </button>
       <button
         type="button"
@@ -690,7 +690,7 @@ export function SettingsPanel({ setSettingsOpen, exportData, importData, mobile,
           >
             {REGIONS.map((r) => (
               <option key={r.code} value={r.code} className="bg-zinc-900 text-zinc-100">
-                {r.flag} {r.label}
+                {r.flag} {t(`region.${r.code}`)}
               </option>
             ))}
           </select>

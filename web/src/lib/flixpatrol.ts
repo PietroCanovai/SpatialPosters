@@ -187,10 +187,10 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, index: nu
 /** Locale TMDB per uno slug paese FlixPatrol; fuori dalle regioni supportate resta it-IT. */
 function tmdbLangForCountry(country: string): string {
   const code = flixSlugToRegionCode(country)
-  return code ? getRegionDef(code).lang : "it-IT"
+  return code ? getRegionDef(code).lang : "en-US"
 }
 
-async function fetchPosterPath(tmdbId: number, mediaType: string, apiKey: string, tmdbLang = "it-IT"): Promise<string | null> {
+async function fetchPosterPath(tmdbId: number, mediaType: string, apiKey: string, tmdbLang = "en-US"): Promise<string | null> {
   const primary = tmdbLang.slice(0, 2).toLowerCase()
   const url = `${TMDB_BASE}/${mediaType}/${tmdbId}/images?api_key=${apiKey}&include_image_language=${primary},en,null`
   try {

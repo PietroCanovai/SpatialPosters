@@ -18,7 +18,7 @@ describe("getUpcomingReleaseLabel", () => {
         mediaType: "movie",
         releaseDate: "2026-12-25",
       })
-      expect(result).toBe("In uscita 25.12.26")
+      expect(result).toBe("In uscita 12.25.26")
     })
 
     it("returns null for a past release date", () => {
@@ -76,12 +76,12 @@ describe("getUpcomingReleaseLabel", () => {
       expect(result).toBeNull()
     })
 
-    it("uses Italian locale by default", () => {
+    it("uses the English date order by default", () => {
       const result = getUpcomingReleaseLabel({
         mediaType: "movie",
         releaseDate: "2026-08-15",
       })
-      expect(result).toBe("In uscita 15.08.26")
+      expect(result).toBe("In uscita 08.15.26")
     })
 
     it("formats date in English locale when specified", () => {
@@ -121,7 +121,7 @@ describe("getUpcomingReleaseLabel", () => {
         mediaType: "tv",
         firstAirDate: "2026-12-25",
       })
-      expect(result).toBe("In uscita 25.12.26")
+      expect(result).toBe("In uscita 12.25.26")
     })
 
     it("ignores releaseDate for tv (usa firstAirDate)", () => {
@@ -154,7 +154,7 @@ describe("getUpcomingReleaseLabel", () => {
         mediaType: "movie",
         releaseDate: "2026-12-31",
       })
-      expect(result).toBe("In uscita 31.12.26")
+      expect(result).toBe("In uscita 12.31.26")
     })
 
     it("handles a date one day in the future", () => {
@@ -162,7 +162,7 @@ describe("getUpcomingReleaseLabel", () => {
         mediaType: "movie",
         releaseDate: "2026-07-28",
       })
-      expect(result).toBe("In uscita 28.07.26")
+      expect(result).toBe("In uscita 07.28.26")
     })
 
     it("handles a date one day in the past", () => {

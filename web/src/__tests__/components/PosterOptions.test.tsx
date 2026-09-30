@@ -50,7 +50,7 @@ describe("PosterOptions", () => {
     const { container } = renderWithCtx(<PosterOptions posters={mockPosters} posterActivePath={null} lang="it" selectPoster={() => {}} />)
     const imgs = container.querySelectorAll("img")
     const cleanSrcs = mockPosters.filter((p) => p.iso_639_1 === null).map((p) =>
-      `https://image.tmdb.org/t/p/w154${p.file_path}`
+      `https://image.tmdb.org/t/p/w342${p.file_path}`
     )
     cleanSrcs.forEach((src) => {
       const match = Array.from(imgs).some((img) => img.getAttribute("src") === src)

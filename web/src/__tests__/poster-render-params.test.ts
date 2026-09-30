@@ -35,7 +35,7 @@ describe("buildPosterRenderSearchParams", () => {
   it("uses production defaults when optional settings are missing", () => {
     const params = buildPosterRenderSearchParams({})
 
-    expect(params.get("lang")).toBe("it")
+    expect(params.get("lang")).toBe("en")
     expect(params.has("badges")).toBe(false)
     expect(params.has("ranking")).toBe(false)
     expect(params.has("be")).toBe(false)

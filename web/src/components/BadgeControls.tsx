@@ -98,7 +98,7 @@ export function BadgeControls() {
                       </span>
                     </span>
                     <span className="flex items-center gap-1 text-[10px] text-muted group-hover:text-zinc-200 font-medium">
-                      <span>{sourcesOpen ? "Chiudi" : "Configura"}</span>
+                      <span>{sourcesOpen ? t("ui.close") : t("ui.configure")}</span>
                       <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-200 ${sourcesOpen ? "rotate-180" : ""}`} />
                     </span>
                   </button>

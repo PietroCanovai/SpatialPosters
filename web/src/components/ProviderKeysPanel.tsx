@@ -4,44 +4,40 @@ import React, { useEffect, useState } from "react"
 import { Check, ExternalLink, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { usePSelector } from "@/lib/context"
+import { useT } from "@/lib/contexts/TranslationContext"
 
 type Provider = "tmdb" | "mdblist" | "tvdb" | "fanart" | "anidb"
 type Keys = Record<Provider, string>
 
-const PROVIDERS: { id: Provider; name: string; required?: boolean; purpose: string; getKeyUrl: string; getKeyHint: string }[] = [
+const PROVIDERS: { id: Provider; name: string; required?: boolean; getKeyUrl: string; getKeyHint: string }[] = [
   {
     id: "tmdb",
     name: "TMDB",
     required: true,
-    purpose: "Required. Artwork, logos, titles, trending lists and search.",
     getKeyUrl: "https://www.themoviedb.org/settings/api",
     getKeyHint: "themoviedb.org → Settings → API → API Key",
   },
   {
     id: "mdblist",
     name: "MDBList",
-    purpose: "Optional. IMDb, Rotten Tomatoes, Letterboxd, Metacritic, Trakt and Simkl ratings on badges.",
     getKeyUrl: "https://mdblist.com/preferences/",
     getKeyHint: "mdblist.com → Preferences → API key",
   },
   {
     id: "fanart",
     name: "Fanart.tv",
-    purpose: "Optional. More posters (including textless ones) from fanart.tv.",
     getKeyUrl: "https://fanart.tv/get-an-api-key/",
     getKeyHint: "fanart.tv → Get an API key (personal key)",
   },
   {
     id: "tvdb",
     name: "TheTVDB",
-    purpose: "Optional. Posters from TheTVDB for series and movies.",
     getKeyUrl: "https://thetvdb.com/api-information",
     getKeyHint: "thetvdb.com → API Information → project API key",
   },
   {
     id: "anidb",
     name: "AniDB",
-    purpose: "Optional. Anime cover from AniDB. Enter a client name registered on your AniDB account (version 1). AniSearch, AniList, Kitsu and TVmaze need no key.",
     getKeyUrl: "https://anidb.net/software/add",
     getKeyHint: "anidb.net → Account → Add client (name, version 1)",
   },
@@ -52,6 +48,7 @@ const PROVIDERS: { id: Provider; name: string; required?: boolean; purpose: stri
  * usate da tutti i render, compresi gli upload verso Jellyfin.
  */
 export function ProviderKeysPanel({ active }: { active: boolean }) {
+  const { t } = useT()
   const setTmdbKey = usePSelector((v) => v.setTmdbKey)
   const setMdblistApiKey = usePSelector((v) => v.setMdblistApiKey)
 
@@ -96,8 +93,8 @@ export function ProviderKeysPanel({ active }: { active: boolean }) {
       setErrors(data.errors || {})
       setTmdbKey(data.keys.tmdb)
       setMdblistApiKey(data.keys.mdblist)
-      if (data.errors && Object.keys(data.errors).length) toast.error("Some keys were rejected")
-      else toast.success("API keys saved")
+      if (data.errors && Object.keys(data.errors).length) toast.error(t("keys.rejected"))
+      else toast.success(t("keys.savedToast"))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e))
     } finally {
@@ -106,9 +103,9 @@ export function ProviderKeysPanel({ active }: { active: boolean }) {
   }
 
   return (
-    <div role="tabpanel" aria-label="API keys" className={`space-y-3 text-xs ${active ? "block" : "hidden"}`}>
+    <div role="tabpanel" aria-label={t("ui.apiKeysTab")} className={`space-y-3 text-xs ${active ? "block" : "hidden"}`}>
       <p className="px-1 text-zinc-400">
-        Keys are checked with each provider, then stored on this computer and used for every poster, including uploads to Jellyfin.
+        {t("keys.intro")}
       </p>
       {PROVIDERS.map((p) => {
         const isSet = !!saved[p.id]
@@ -116,10 +113,10 @@ export function ProviderKeysPanel({ active }: { active: boolean }) {
           <div key={p.id} className="space-y-2 rounded-xl border border-surface2/60 bg-surface/50 p-3.5 shadow-sm">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-zinc-100">{p.name}</span>
-              {p.required && !isSet && <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">Required</span>}
+              {p.required && !isSet && <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">{t("keys.required")}</span>}
               {isSet && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
-                  <Check className="h-3 w-3" /> Saved
+                  <Check className="h-3 w-3" /> {t("keys.saved")}
                 </span>
               )}
               <a
@@ -129,10 +126,10 @@ export function ProviderKeysPanel({ active }: { active: boolean }) {
                 title={p.getKeyHint}
                 className="ml-auto inline-flex items-center gap-1 text-[11px] text-zinc-400 hover:text-zinc-200"
               >
-                Get a key <ExternalLink className="h-3 w-3" />
+                {t("keys.getKey")} <ExternalLink className="h-3 w-3" />
               </a>
             </div>
-            <p className="text-[11px] text-zinc-400">{p.purpose}</p>
+            <p className="text-[11px] text-zinc-400">{t(`keys.purpose.${p.id}`)}</p>
             <input
               type={p.id === "anidb" ? "text" : "password"}
               autoComplete="off"
@@ -156,7 +153,7 @@ export function ProviderKeysPanel({ active }: { active: boolean }) {
           className="inline-flex items-center gap-1.5 rounded-xl bg-white px-4 py-2 text-xs font-semibold text-zinc-950 disabled:opacity-40"
         >
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-          Save keys
+          {t("keys.save")}
         </button>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Eye, EyeOff, Check, X, ShieldCheck } from "lucide-react"
 import { BladeSpinner } from "./BladeSpinner"
+import { useT } from "@/lib/contexts/TranslationContext"
 
 export function SecretInput({
   label,
@@ -25,6 +26,7 @@ export function SecretInput({
   error?: string
   onValidate?: (v: string) => Promise<boolean | void>
 }) {
+  const { t } = useT()
   const [show, setShow] = useState(false)
   const [validating, setValidating] = useState(false)
   const [validStatus, setValidStatus] = useState<"valid" | "invalid" | null>(null)
@@ -72,7 +74,7 @@ export function SecretInput({
           onClick={() => setShow((s) => !s)}
           className="px-2 bg-surface2 rounded-lg text-xs hover:bg-zinc-700 active:scale-90 transition-all duration-150 text-zinc-300"
           aria-label={show ? "Hide password" : "Show password"}
-          title={show ? "Nascondi chiave" : "Mostra chiave"}
+          title={show ? t("ui.hideKey") : t("ui.showKey")}
         >
           {show ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
         </button>
@@ -88,8 +90,8 @@ export function SecretInput({
                   ? "bg-red-500/20 text-red-400 border-red-500/40"
                   : "bg-surface2 border-surface2/60 text-zinc-300 hover:text-white hover:bg-zinc-700 active:scale-90"
             }`}
-            title="Verifica validità chiave"
-            aria-label="Verifica validità chiave"
+            title={t("ui.checkKey")}
+            aria-label={t("ui.checkKey")}
           >
             {validating ? (
               <BladeSpinner size="14px" />

@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   if (!rl.ok) return rateLimitResponse(rl.retAfter)
   const rawQuery = req.nextUrl.searchParams.get("q")
   const query = rawQuery ? rawQuery.trim().slice(0, 100) : null
-  const language = req.nextUrl.searchParams.get("language") || "it-IT"
+  const language = req.nextUrl.searchParams.get("language") || "en-US"
   const apiKey = req.nextUrl.searchParams.get("api_key") || undefined
   const page = parseInt(req.nextUrl.searchParams.get("page") || "1", 10)
   const acceptEncoding = req.headers.get("accept-encoding")

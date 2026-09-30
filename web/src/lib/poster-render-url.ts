@@ -50,7 +50,7 @@ export function buildPosterRenderUrl(input: BuildPosterRenderUrlInput): URL {
     animerank: input.animerank,
     user: input.user,
     region: input.region ?? input.defaults.region,
-    lang: input.lang || "it",
+    lang: input.lang || "en",
     // Per-titolo vince sui default globali, con emissione ESPLICITA in query:
     // il fallback server (mapping quando il parametro manca) è fragile —
     // con installazioni ?config= il token scavalca il mapping (poster-config:

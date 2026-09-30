@@ -33,10 +33,10 @@ export async function POST(req: NextRequest): Promise<Response> {
           return Response.json({ valid: true })
         }
       }
-      return Response.json({ valid: false, message: "Chiave TMDB non valida" })
+      return Response.json({ valid: false, message: "Invalid TMDB key" })
     } catch (e) {
       log.warn("TMDB key validation failed", { error: e instanceof Error ? e.message : String(e) })
-      return Response.json({ valid: false, message: "Errore di connessione a TMDB" }, { status: 502 })
+      return Response.json({ valid: false, message: "Could not reach TMDB" }, { status: 502 })
     }
   }
 
@@ -51,10 +51,10 @@ export async function POST(req: NextRequest): Promise<Response> {
           return Response.json({ valid: true })
         }
       }
-      return Response.json({ valid: false, message: "Chiave MDBList non valida" })
+      return Response.json({ valid: false, message: "Invalid MDBList key" })
     } catch (e) {
       log.warn("MDBList key validation failed", { error: e instanceof Error ? e.message : String(e) })
-      return Response.json({ valid: false, message: "Errore di connessione a MDBList" }, { status: 502 })
+      return Response.json({ valid: false, message: "Could not reach MDBList" }, { status: 502 })
     }
   }
 
@@ -72,10 +72,10 @@ export async function POST(req: NextRequest): Promise<Response> {
           return Response.json({ valid: true })
         }
       }
-      return Response.json({ valid: false, message: "Chiave TVDB non valida" })
+      return Response.json({ valid: false, message: "Invalid TVDB key" })
     } catch (e) {
       log.warn("TVDB key validation failed", { error: e instanceof Error ? e.message : String(e) })
-      return Response.json({ valid: false, message: "Errore di connessione a TheTVDB" }, { status: 502 })
+      return Response.json({ valid: false, message: "Could not reach TheTVDB" }, { status: 502 })
     }
   }
 

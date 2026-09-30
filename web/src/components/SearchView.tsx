@@ -10,6 +10,7 @@ import { SearchBar } from "@/components/SearchBar"
 import { PosterCardSkeleton } from "@/components/Skeleton"
 import { Clock, X, Check, ChevronDown, Clapperboard, Tv, Star, Trash2 } from "lucide-react"
 import { BladeSpinner } from "@/components/ui/BladeSpinner"
+import { getLang } from "@/lib/i18n"
 import { PosterDepthEdge } from "@/components/PosterDepthGlow"
 
 export function SearchView() {
@@ -157,7 +158,7 @@ export function SearchView() {
               const posterSrc = mapping?.imgbbUrl
                 ? mapping.imgbbUrl
                 : mapping
-                ? `/api/poster/${r.media_type}/${r.id}${tmdbKey ? `?api_key=${encodeURIComponent(tmdbKey)}` : ""}`
+                ? `/api/poster/${r.media_type}/${r.id}?lang=${getLang()}${tmdbKey ? `&api_key=${encodeURIComponent(tmdbKey)}` : ""}`
                 : r.poster_path
                 ? posterUrl(r.poster_path, "w342")
                 : null

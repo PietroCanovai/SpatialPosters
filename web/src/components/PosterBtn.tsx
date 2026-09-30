@@ -25,7 +25,7 @@ export const PosterBtn = React.memo(function PosterBtn({ img, active, onSelect, 
     >
       <div className="aspect-[2/3] relative overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element -- TMDB dynamic URL */}
-        <img src={posterUrl(img.file_path, "w154")} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+        <img src={posterUrl(img.file_path, "w342")} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         {active && (
           <>
             <div className="absolute inset-0 bg-accent-orange/10" />
@@ -37,9 +37,9 @@ export const PosterBtn = React.memo(function PosterBtn({ img, active, onSelect, 
         )}
         {!active && <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-white/5 transition-opacity duration-300" />}
 
-        {/* Risoluzione dell'originale TMDB (i poster da URL custom/Reddit non hanno dimensioni reali) */}
+        {/* Risoluzione dell'originale (i poster da URL custom/Reddit non hanno dimensioni reali). Miniatura w342: la w154 era sgranata sugli schermi HiDPI. */}
         {img.width > 0 && img.height > 0 && (!/^https?:\/\//.test(img.file_path) || "source" in img) && (
-          <span className={`absolute left-1 ${active ? "bottom-5" : "bottom-1"} z-10 text-[9px] font-mono font-semibold tabular-nums px-1 py-px rounded bg-black/70 text-zinc-100 backdrop-blur-sm`}>
+          <span className={`absolute left-1 ${active ? "bottom-5" : "bottom-1"} z-10 text-[11px] leading-none font-semibold tabular-nums tracking-tight px-1.5 py-1 rounded-md bg-black/85 text-white ring-1 ring-white/15 shadow-md shadow-black/50`}>
             {img.width}×{img.height}
           </span>
         )}
